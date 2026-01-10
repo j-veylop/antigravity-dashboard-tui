@@ -23,7 +23,7 @@ go install github.com/j-veylop/antigravity-dashboard-tui/cmd/adt@latest
 ```bash
 git clone https://github.com/j-veylop/antigravity-dashboard-tui.git
 cd antigravity-dashboard-tui
-go build -o adt ./cmd/adt
+make build
 ./adt
 ```
 

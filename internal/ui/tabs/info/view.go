@@ -3,25 +3,12 @@ package info
 import (
 	"fmt"
 	"runtime"
-	"time"
 
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/j-veylop/antigravity-dashboard-tui/internal/ui/styles"
+	"github.com/j-veylop/antigravity-dashboard-tui/internal/version"
 )
-
-// Version info - can be set at build time
-var (
-	Version   = "0.1.0"
-	BuildDate = "dev"
-	GitCommit = "unknown"
-)
-
-func init() {
-	if BuildDate == "dev" {
-		BuildDate = time.Now().Format("2006-01-02") + "-dev"
-	}
-}
 
 // View renders the info tab.
 func (m *Model) View() string {
@@ -110,9 +97,9 @@ func (m *Model) renderAboutCard() string {
 	rows = append(rows, styles.CardTitleStyle.Render("About Antigravity Dashboard TUI"))
 	rows = append(rows, "")
 
-	rows = append(rows, m.renderConfigRow("Version", Version))
-	rows = append(rows, m.renderConfigRow("Build Date", BuildDate))
-	rows = append(rows, m.renderConfigRow("Git Commit", GitCommit))
+	rows = append(rows, m.renderConfigRow("Version", version.Version))
+	rows = append(rows, m.renderConfigRow("Build Date", version.Date))
+	rows = append(rows, m.renderConfigRow("Git Commit", version.Commit))
 	rows = append(rows, m.renderConfigRow("Go Version", runtime.Version()))
 	rows = append(rows, m.renderConfigRow("Platform", fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)))
 	rows = append(rows, "")

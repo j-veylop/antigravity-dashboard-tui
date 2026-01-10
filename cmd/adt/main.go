@@ -16,19 +16,13 @@ import (
 	"github.com/j-veylop/antigravity-dashboard-tui/internal/ui/tabs/dashboard"
 	"github.com/j-veylop/antigravity-dashboard-tui/internal/ui/tabs/history"
 	"github.com/j-veylop/antigravity-dashboard-tui/internal/ui/tabs/info"
-)
-
-// Version information (set during build)
-var (
-	version = "dev"
-	commit  = "none"
-	date    = "unknown"
+	"github.com/j-veylop/antigravity-dashboard-tui/internal/version"
 )
 
 func main() {
 	// Handle version flag
 	if len(os.Args) > 1 && (os.Args[1] == "-v" || os.Args[1] == "--version") {
-		fmt.Printf("antigravity-dashboard-tui %s (commit: %s, built: %s)\n", version, commit, date)
+		fmt.Println(version.Info())
 		os.Exit(0)
 	}
 

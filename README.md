@@ -15,40 +15,37 @@
 ### Using Go
 
 ```bash
-go install github.com/j-veylop/antigravity-dashboard-tui/cmd/antigravity-dashboard-tui@latest
+go install github.com/j-veylop/antigravity-dashboard-tui/cmd/adt@latest
 ```
 
 ### From Source
 
 ```bash
 git clone https://github.com/j-veylop/antigravity-dashboard-tui.git
-cd antigravity-tui
-go build -o antigravity ./cmd/antigravity
-./antigravity
+cd antigravity-dashboard-tui
+go build -o adt ./cmd/adt
+./adt
 ```
 
 ## ⚙️ Configuration
 
-Antigravity Dashboard TUI looks for configuration in environment variables or a `.env` file.
+Antigravity Dashboard TUI looks for configuration in environment variables or a `.env` file. It also supports automated Google OAuth configuration via `opencode-antigravity-auth`.
 
 ### Environment Variables
 
 | Variable                 | Description                   | Default                                        |
 | ------------------------ | ----------------------------- | ---------------------------------------------- |
-| `GOOGLE_CLIENT_ID`       | Google OAuth Client ID        | **Required**                                   |
-| `GOOGLE_CLIENT_SECRET`   | Google OAuth Client Secret    | **Required**                                   |
+| `GOOGLE_CLIENT_ID`       | Google OAuth Client ID        | Optional if automated auth is used             |
+| `GOOGLE_CLIENT_SECRET`   | Google OAuth Client Secret    | Optional if automated auth is used             |
 | `DATABASE_PATH`          | Path to SQLite usage database | `~/.config/opencode/antigravity-tui/usage.db`  |
 | `ACCOUNTS_PATH`          | Path to accounts JSON file    | `~/.config/opencode/antigravity-accounts.json` |
 | `QUOTA_REFRESH_INTERVAL` | How often to poll Google API  | `30s`                                          |
 
+### Automated Configuration
+
+If you have `opencode-antigravity-auth` installed, the application will automatically pick up the Google OAuth credentials from there.
+
 ### `.env` File Locations
-
-The application searches for a `.env` file in:
-
-1. Current directory
-2. `~/.config/opencode/antigravity-tui/.env`
-3. `~/.config/opencode/.env`
-4. `~/.antigravity/.env`
 
 You can copy the example file to get started:
 
@@ -56,7 +53,7 @@ You can copy the example file to get started:
 cp .env.example .env
 ```
 
-Then edit `.env` and add your Google OAuth credentials.
+Then edit `.env` and add your Google OAuth credentials if not using automated auth.
 
 ## ⌨️ Keyboard Shortcuts
 
@@ -64,7 +61,7 @@ Then edit `.env` and add your Google OAuth credentials.
 
 | Key             | Action                                            |
 | --------------- | ------------------------------------------------- |
-| `1` - `4`       | Switch Tabs (Dashboard, Accounts, Logs, Settings) |
+| `1` - `3`       | Switch Tabs (Dashboard, History, Info)            |
 | `Tab`           | Next Tab                                          |
 | `Shift+Tab`     | Previous Tab                                      |
 | `r`             | Refresh all data                                  |
@@ -77,19 +74,14 @@ Then edit `.env` and add your Google OAuth credentials.
 
 | Key               | Action           |
 | ----------------- | ---------------- |
-| `n` or `j` or `↓` | Next Account     |
-| `p` or `k` or `↑` | Previous Account |
+| `j` or `↓`        | Next Account     |
+| `k` or `↑`        | Previous Account |
 
-#### 👥 Accounts
+#### 👥 Accounts (Upcoming)
 
-| Key        | Action                     |
-| ---------- | -------------------------- |
-| `Enter`    | Switch to selected account |
-| `n` or `a` | Add new account            |
-| `d`        | Delete selected account    |
-| `Esc`      | Cancel / Close form        |
+*Manage multiple Google accounts directly from the TUI.*
 
-#### 📜 Lists (Logs/Accounts)
+#### 📜 History
 
 | Key             | Action                                      |
 | --------------- | ------------------------------------------- |
@@ -97,7 +89,7 @@ Then edit `.env` and add your Google OAuth credentials.
 | `PgUp` / `PgDn` | Scroll page up/down                         |
 | `g` / `G`       | Jump to top/bottom                          |
 | `/`             | Filter list                                 |
-| `c`             | Copy (Request ID in Logs, Path in Settings) |
+| `c`             | Copy selection                              |
 
 ## 🏗️ Architecture
 

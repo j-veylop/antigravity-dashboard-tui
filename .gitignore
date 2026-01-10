@@ -1,0 +1,52 @@
+# Binaries
+antigravity
+antigravity.exe
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binaries
+*.test
+
+# Output of go coverage
+*.out
+*.prof
+
+# Go workspace file
+go.work
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+credentials.json
+secrets.json
+*.secret
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Debug
+debug
+*.log
+
+# Build artifacts
+dist/
+build/
+bin/
+
+# Database files (local development)
+*.db
+*.db-shm
+*.db-wal

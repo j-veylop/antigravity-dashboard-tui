@@ -36,17 +36,23 @@ func Load() (*Config, error) {
 		}
 	}
 
+	antigravityConstants := LoadAntigravityConstants()
+	var defaultClientID, defaultClientSecret string
+	if antigravityConstants != nil {
+		defaultClientID = antigravityConstants.ClientID
+		defaultClientSecret = antigravityConstants.ClientSecret
+	}
+
 	cfg := &Config{
 		DatabasePath:         getEnvString("DATABASE_PATH", getDefaultDatabasePath()),
 		AccountsPath:         getEnvString("ACCOUNTS_PATH", getDefaultAccountsPath()),
-		GoogleClientID:       getEnvString("GOOGLE_CLIENT_ID", ""),
-		GoogleClientSecret:   getEnvString("GOOGLE_CLIENT_SECRET", ""),
+		GoogleClientID:       getEnvString("GOOGLE_CLIENT_ID", defaultClientID),
+		GoogleClientSecret:   getEnvString("GOOGLE_CLIENT_SECRET", defaultClientSecret),
 		QuotaRefreshInterval: getEnvDuration("QUOTA_REFRESH_INTERVAL", defaultQuotaRefreshInterval),
 	}
 
-	// Validate required configuration
 	if cfg.GoogleClientID == "" || cfg.GoogleClientSecret == "" {
-		return nil, fmt.Errorf("GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are required")
+		return nil, fmt.Errorf("GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are required (set via env or opencode-antigravity-auth)")
 	}
 
 	// Ensure database directory exists

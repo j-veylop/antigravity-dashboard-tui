@@ -16,13 +16,12 @@ import (
 )
 
 var (
-	// Antigravity endpoints from reference implementation
 	antigravityEndpoints = []string{
 		"https://cloudcode-pa.googleapis.com",
 		"https://daily-cloudcode-pa.sandbox.googleapis.com",
+		"https://autopush-cloudcode-pa.sandbox.googleapis.com",
 	}
 
-	// Antigravity headers from reference implementation
 	antigravityHeaders = map[string]string{
 		"User-Agent":        "antigravity/1.11.5 windows/amd64",
 		"X-Goog-Api-Client": "google-cloud-sdk vscode_cloudshelleditor/0.1",

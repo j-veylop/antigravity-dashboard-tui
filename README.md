@@ -15,7 +15,7 @@
 ### Using Go
 
 ```bash
-go install github.com/j-veylop/antigravity-dashboard-tui/cmd/antigravity@latest
+go install github.com/j-veylop/antigravity-dashboard-tui/cmd/antigravity-dashboard-tui@latest
 ```
 
 ### From Source

@@ -1,6 +1,6 @@
 # 🌌 Antigravity Dashboard TUI
 
-**Antigravity Dashboard TUI** is a single-process terminal interface for monitoring Antigravity quotas across multiple accounts. It provides real-time visibility into Claude and Gemini API usage, reset timers, and subscription tiers, all within a keyboard-driven interface built with [Bubble Tea](https://github.com/charmbracelet/bubbletea).
+**Antigravity Dashboard TUI** is a single-process terminal interface for monitoring Antigravity quotas across multiple accounts. It provides real-time visibility into Claude and Gemini API usage, reset timers, and subscription tiers, all within a keyboard-driven interface built with [Bubble Tea](https://github.com/charmbracelet/bubbletea). Based on [Antigravity Dashboard](https://github.com/OmerFarukOruc/antigravity-dashboard).
 
 ## ✨ Features
 
@@ -15,13 +15,13 @@
 ### Using Go
 
 ```bash
-go install github.com/antigravity/antigravity-tui/cmd/antigravity@latest
+go install github.com/j-veylop/antigravity-dashboard-tui/cmd/antigravity@latest
 ```
 
 ### From Source
 
 ```bash
-git clone https://github.com/antigravity/antigravity-tui.git
+git clone https://github.com/j-veylop/antigravity-dashboard-tui.git
 cd antigravity-tui
 go build -o antigravity ./cmd/antigravity
 ./antigravity
@@ -108,4 +108,4 @@ Then edit `.env` and add your Google OAuth credentials.
 
 ## 📄 License
 
-MIT © [Antigravity Team](https://github.com/antigravity)
+MIT © [J-Veylop](https://github.com/j-veylop)

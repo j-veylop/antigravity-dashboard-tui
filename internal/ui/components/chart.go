@@ -36,7 +36,10 @@ func RenderLineChart(data []float64, width, height int, caption string) string {
 		asciigraph.Height(height),
 		asciigraph.Width(width),
 		asciigraph.Caption(caption),
+		asciigraph.SeriesColors(asciigraph.Magenta),
 	)
+
+	graph = strings.ReplaceAll(graph, "\x1b[35m", "\x1b[38;2;125;86;244m")
 
 	return graph
 }
@@ -68,13 +71,16 @@ func RenderDualLineChart(claude, gemini []float64, width, height int, caption st
 
 	graph := asciigraph.PlotMany([][]float64{claudeData, geminiData},
 		asciigraph.Height(height),
-		asciigraph.Width(width),
+		asciigraph.Width(width-10), // Subtract padding for Y axis labels
 		asciigraph.Caption(caption),
 		asciigraph.SeriesColors(
 			asciigraph.Red,
 			asciigraph.Blue,
 		),
 	)
+
+	graph = strings.ReplaceAll(graph, "\x1b[31m", "\x1b[38;2;204;120;92m")
+	graph = strings.ReplaceAll(graph, "\x1b[34m", "\x1b[38;2;66;133;244m")
 
 	return graph
 }
@@ -126,9 +132,10 @@ func RenderBarChart(values []float64, labels []string, width int) string {
 		}
 
 		bar := strings.Repeat("█", barLen)
-		valueStr := fmt.Sprintf(" %.1f", v)
+		barColored := lipgloss.NewStyle().Foreground(ChartPrimaryColor).Render(bar)
+		valueStr := fmt.Sprintf(" %.1f%%", v)
 
-		line := paddedLabel + " │" + bar + valueStr
+		line := paddedLabel + " │" + barColored + valueStr
 		lines = append(lines, line)
 	}
 
@@ -158,8 +165,16 @@ func RenderHourlyHeatmap(patterns []float64) string {
 		maxVal = 1
 	}
 
+	// Render heatmap
+	// Ensure it doesn't wrap lines if we have a lot of width,
+	// but also handles narrow terminals gracefully.
+	// 24 hours * (1 char + 1 char gap) = 48 chars minimum + "00 " + " 23"
+
 	var result strings.Builder
-	result.WriteString("00 ")
+
+	// Create the heatmap line
+	var heatmapBuilder strings.Builder
+	heatmapBuilder.WriteString("00 ")
 
 	for i, v := range patterns {
 		intensity := int((v / maxVal) * float64(len(HeatmapBlocks)-1))
@@ -183,15 +198,16 @@ func RenderHourlyHeatmap(patterns []float64) string {
 			style = lipgloss.NewStyle().Foreground(styles.Error)
 		}
 
-		result.WriteString(style.Render(string(HeatmapBlocks[intensity])))
+		heatmapBuilder.WriteString(style.Render(string(HeatmapBlocks[intensity])))
 
 		// Add gap at noon for readability
 		if i == 11 {
-			result.WriteString(" ")
+			heatmapBuilder.WriteString(" ")
 		}
 	}
+	heatmapBuilder.WriteString(" 23")
 
-	result.WriteString(" 23")
+	result.WriteString(heatmapBuilder.String())
 	return result.String()
 }
 

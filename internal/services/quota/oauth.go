@@ -108,8 +108,9 @@ func RefreshAccessToken(refreshToken, clientID, clientSecret string) (*TokenResp
 	return &tokenResp, nil
 }
 
-// QuotaResponse represents the full quota API response.
-type QuotaResponse struct {
+// Response represents the full quota API response.
+// Response represents the full quota API response.
+type Response struct {
 	ModelQuotas []models.ModelQuota `json:"modelQuotas"`
 }
 
@@ -136,7 +137,8 @@ func normalizeModelFamily(name string) string {
 }
 
 // FetchQuota retrieves quota information from the Google Cloud Code API.
-func FetchQuota(accessToken string) (*QuotaResponse, error) {
+// FetchQuota retrieves quota information from the Google Cloud Code API.
+func FetchQuota(accessToken string) (*Response, error) {
 	if accessToken == "" {
 		return nil, fmt.Errorf("access token is empty")
 	}
@@ -145,96 +147,110 @@ func FetchQuota(accessToken string) (*QuotaResponse, error) {
 
 	// Try each endpoint
 	for _, endpoint := range antigravityEndpoints {
-		url := endpoint + "/v1internal:fetchAvailableModels"
-		req, err := http.NewRequestWithContext(context.Background(), "POST", url, strings.NewReader("{}"))
+		body, err := makeQuotaRequest(endpoint, accessToken)
 		if err != nil {
-			lastErr = fmt.Errorf("failed to create quota request: %w", err)
+			lastErr = err
 			continue
 		}
 
-		req.Header.Set("Authorization", "Bearer "+accessToken)
-		req.Header.Set("Content-Type", "application/json")
-		for k, v := range antigravityHeaders {
-			req.Header.Set(k, v)
-		}
-
-		client := &http.Client{Timeout: 30 * time.Second}
-		resp, err := client.Do(req)
+		modelQuotas, err := parseQuotaResponse(body)
 		if err != nil {
-			lastErr = fmt.Errorf("quota request failed: %w", err)
-			continue
-		}
-		defer func() {
-			if err := resp.Body.Close(); err != nil {
-				logger.Error("failed to close response body", "error", err)
-			}
-		}()
-
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			lastErr = fmt.Errorf("failed to read quota response: %w", err)
+			lastErr = err
 			continue
 		}
 
-		if resp.StatusCode == http.StatusUnauthorized {
-			return nil, fmt.Errorf("unauthorized: access token may be expired")
-		}
-
-		if resp.StatusCode != http.StatusOK {
-			lastErr = fmt.Errorf("quota request failed (status %d): %s", resp.StatusCode, string(body))
-			continue
-		}
-
-		var modelsResp fetchModelsResponse
-		if err := json.Unmarshal(body, &modelsResp); err != nil {
-			lastErr = fmt.Errorf("failed to parse quota response: %w", err)
-			continue
-		}
-
-		// Convert to QuotaResponse format
-		var modelQuotas []models.ModelQuota
-		now := time.Now()
-
-		for name, data := range modelsResp.Models {
-			resetTimeStr := data.QuotaInfo.ResetTime
-			var resetTime time.Time
-			if resetTimeStr != "" {
-				resetTime, _ = time.Parse(time.RFC3339, resetTimeStr)
-			}
-
-			remainingFraction := data.QuotaInfo.RemainingFraction
-			// Assuming limit is 100 for percentage calculation relative to fraction
-			limit := int64(100)
-			used := int64(100 - (remainingFraction * 100))
-			remaining := int64(remainingFraction * 100)
-
-			var usagePercentage float64
-			if used > 0 {
-				usagePercentage = float64(used)
-			}
-
-			mq := models.ModelQuota{
-				ModelFamily:      normalizeModelFamily(name),
-				Tier:             string(detectSubscriptionTier(resetTime)),
-				Used:             used,
-				Limit:            limit,
-				ResetTime:        resetTime,
-				Remaining:        remaining,
-				UsagePercentage:  usagePercentage,
-				IsRateLimited:    remaining == 0,
-				LastUpdated:      now,
-				SubscriptionTier: string(detectSubscriptionTier(resetTime)),
-			}
-			modelQuotas = append(modelQuotas, mq)
-		}
-
-		return &QuotaResponse{ModelQuotas: modelQuotas}, nil
+		return &Response{ModelQuotas: modelQuotas}, nil
 	}
 
 	if lastErr != nil {
 		return nil, lastErr
 	}
 	return nil, fmt.Errorf("failed to fetch quota from any endpoint")
+}
+
+func makeQuotaRequest(endpoint, accessToken string) ([]byte, error) {
+	url := endpoint + "/v1internal:fetchAvailableModels"
+	req, err := http.NewRequestWithContext(context.Background(), "POST", url, strings.NewReader("{}"))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create quota request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Content-Type", "application/json")
+	for k, v := range antigravityHeaders {
+		req.Header.Set(k, v)
+	}
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("quota request failed: %w", err)
+	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			logger.Error("failed to close response body", "error", err)
+		}
+	}()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read quota response: %w", err)
+	}
+
+	if resp.StatusCode == http.StatusUnauthorized {
+		return nil, fmt.Errorf("unauthorized: access token may be expired")
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("quota request failed (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	return body, nil
+}
+
+func parseQuotaResponse(body []byte) ([]models.ModelQuota, error) {
+	var modelsResp fetchModelsResponse
+	if err := json.Unmarshal(body, &modelsResp); err != nil {
+		return nil, fmt.Errorf("failed to parse quota response: %w", err)
+	}
+
+	var modelQuotas []models.ModelQuota
+	now := time.Now()
+
+	for name, data := range modelsResp.Models {
+		resetTimeStr := data.QuotaInfo.ResetTime
+		var resetTime time.Time
+		if resetTimeStr != "" {
+			resetTime, _ = time.Parse(time.RFC3339, resetTimeStr)
+		}
+
+		remainingFraction := data.QuotaInfo.RemainingFraction
+		// Assuming limit is 100 for percentage calculation relative to fraction
+		limit := int64(100)
+		used := int64(100 - (remainingFraction * 100))
+		remaining := int64(remainingFraction * 100)
+
+		var usagePercentage float64
+		if used > 0 {
+			usagePercentage = float64(used)
+		}
+
+		mq := models.ModelQuota{
+			ModelFamily:      normalizeModelFamily(name),
+			Tier:             detectSubscriptionTier(resetTime),
+			Used:             used,
+			Limit:            limit,
+			ResetTime:        resetTime,
+			Remaining:        remaining,
+			UsagePercentage:  usagePercentage,
+			IsRateLimited:    remaining == 0,
+			LastUpdated:      now,
+			SubscriptionTier: detectSubscriptionTier(resetTime),
+		}
+		modelQuotas = append(modelQuotas, mq)
+	}
+
+	return modelQuotas, nil
 }
 
 // UserInfo represents user information from Google.
@@ -249,6 +265,7 @@ type UserInfo struct {
 	Locale        string `json:"locale"`
 }
 
+// FetchUserInfo retrieves user information from Google.
 // FetchUserInfo retrieves user information from Google.
 func FetchUserInfo(accessToken string) (*UserInfo, error) {
 	if accessToken == "" {

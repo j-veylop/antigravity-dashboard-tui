@@ -7,8 +7,10 @@ import "time"
 type TimeRange int
 
 const (
+	// TimeRange24Hours shows data from the last 24 hours.
+	TimeRange24Hours TimeRange = iota
 	// TimeRange7Days shows data from the last 7 days.
-	TimeRange7Days TimeRange = iota
+	TimeRange7Days
 	// TimeRange30Days shows data from the last 30 days.
 	TimeRange30Days
 	// TimeRangeAllTime shows all available historical data.
@@ -18,6 +20,8 @@ const (
 // String returns the display name for a time range.
 func (t TimeRange) String() string {
 	switch t {
+	case TimeRange24Hours:
+		return "24 Hours"
 	case TimeRange7Days:
 		return "7 Days"
 	case TimeRange30Days:
@@ -32,6 +36,8 @@ func (t TimeRange) String() string {
 // Days returns the number of days for the time range (0 = unlimited).
 func (t TimeRange) Days() int {
 	switch t {
+	case TimeRange24Hours:
+		return 1
 	case TimeRange7Days:
 		return 7
 	case TimeRange30Days:
@@ -45,7 +51,7 @@ func (t TimeRange) Days() int {
 
 // Next cycles to the next time range.
 func (t TimeRange) Next() TimeRange {
-	return (t + 1) % 3
+	return (t + 1) % 4
 }
 
 // RateLimitHit represents a single rate limit transition event.

@@ -25,7 +25,7 @@ func TestGetMonthlyStats_WithData(t *testing.T) {
 	defer db.Close()
 
 	now := time.Now().UTC()
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		snapshot := &models.AggregatedSnapshot{
 			Email:          "test@example.com",
 			BucketTime:     now.Add(time.Duration(-i) * time.Hour).Truncate(5 * time.Minute),
@@ -97,7 +97,7 @@ func TestGetUsagePatterns_WithData(t *testing.T) {
 	db := newTestDB(t)
 	defer db.Close()
 
-	for day := 0; day < 7; day++ {
+	for day := range 7 {
 		for hour := 9; hour < 17; hour++ {
 			bucketTime := time.Date(2024, 1, 1+day, hour, 0, 0, 0, time.UTC)
 			snapshot := &models.AggregatedSnapshot{
@@ -132,7 +132,7 @@ func TestGetHistoricalContext_Empty(t *testing.T) {
 		t.Fatalf("Failed to get historical context: %v", err)
 	}
 	if ctx == nil {
-		t.Error("Expected non-nil context")
+		t.Fatal("Expected non-nil context")
 	}
 	if ctx.TotalSessionsEver != 0 {
 		t.Errorf("Expected 0 sessions, got %d", ctx.TotalSessionsEver)
@@ -144,7 +144,7 @@ func TestGetHistoricalContext_WithData(t *testing.T) {
 	defer db.Close()
 
 	now := time.Now().UTC()
-	for i := 0; i < 50; i++ {
+	for i := range 50 {
 		snapshot := &models.AggregatedSnapshot{
 			Email:          "test@example.com",
 			BucketTime:     now.Add(time.Duration(-i) * time.Hour).Truncate(5 * time.Minute),
@@ -209,7 +209,7 @@ func TestGetHistoricalContext_PeakDay(t *testing.T) {
 	db := newTestDB(t)
 	defer db.Close()
 
-	for i := 0; i < 7; i++ {
+	for i := range 7 {
 		consumption := 1.0
 		if i == 3 {
 			consumption = 10.0

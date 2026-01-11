@@ -4,6 +4,7 @@ package accounts
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"sync"
@@ -15,8 +16,8 @@ import (
 	"github.com/j-veylop/antigravity-dashboard-tui/internal/models"
 )
 
-// AccountsFile represents the JSON file structure for accounts storage.
-type AccountsFile struct {
+// File represents the JSON file structure for accounts storage.
+type File struct {
 	Accounts      []models.Account `json:"accounts"`
 	ActiveAccount string           `json:"activeAccount,omitempty"`
 	Version       int              `json:"version,omitempty"`
@@ -33,12 +34,19 @@ type Event struct {
 type EventType int
 
 const (
+	// EventAccountsLoaded indicates that the accounts have been initially loaded.
 	EventAccountsLoaded EventType = iota
+	// EventAccountsChanged indicates that the accounts list has changed (general change).
 	EventAccountsChanged
+	// EventAccountAdded indicates that a new account has been added.
 	EventAccountAdded
+	// EventAccountUpdated indicates that an existing account has been updated.
 	EventAccountUpdated
+	// EventAccountDeleted indicates that an account has been deleted.
 	EventAccountDeleted
+	// EventActiveAccountChanged indicates that the active account has changed.
 	EventActiveAccountChanged
+	// EventError indicates that an error occurred in the account service.
 	EventError
 )
 
@@ -79,7 +87,7 @@ func New(filePath string) (*Service, error) {
 
 	// Ensure directory exists
 	dir := filepath.Dir(filePath)
-	if err := os.MkdirAll(dir, 0750); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return nil, fmt.Errorf("failed to create config directory: %w", err)
 	}
 
@@ -121,9 +129,7 @@ func (s *Service) GetAccounts() []models.Account {
 
 		if acc.RateLimitResetTimes != nil {
 			accounts[i].RateLimitResetTimes = make(map[string]int64, len(acc.RateLimitResetTimes))
-			for k, v := range acc.RateLimitResetTimes {
-				accounts[i].RateLimitResetTimes[k] = v
-			}
+			maps.Copy(accounts[i].RateLimitResetTimes, acc.RateLimitResetTimes)
 		}
 	}
 	return accounts
@@ -335,78 +341,116 @@ func (s *Service) UpdateAccountEmail(oldEmail, newEmail string) error {
 
 // parseAccounts parses account data handling multiple formats.
 func (s *Service) parseAccounts(data []byte) ([]models.Account, string, error) {
-	// 1. Try format from JS dashboard (via models package)
+	if accs, active, err := s.parseJSDashboardFormat(data); err == nil {
+		return accs, active, nil
+	}
+
+	if accs, active, err := s.parseStandardFormat(data); err == nil {
+		return accs, active, nil
+	}
+
+	if accs, active, err := s.parseLegacyFormat(data); err == nil {
+		return accs, active, nil
+	}
+
+	return nil, "", fmt.Errorf("failed to parse accounts file: invalid format")
+}
+
+func (s *Service) parseLegacyFormat(data []byte) ([]models.Account, string, error) {
+	var accounts []models.Account
+	if err := json.Unmarshal(data, &accounts); err != nil {
+		return nil, "", err
+	}
+
+	var activeAccount string
+	if len(accounts) > 0 {
+		activeAccount = accounts[0].Email
+	}
+
+	for i := range accounts {
+		if accounts[i].RateLimitResetTimes == nil {
+			accounts[i].RateLimitResetTimes = make(map[string]int64)
+		}
+	}
+	return accounts, activeAccount, nil
+}
+
+func (s *Service) getDefaultActiveAccount(accounts []models.Account) string {
+	if len(accounts) == 0 {
+		return ""
+	}
+	if accounts[0].ID != "" {
+		return accounts[0].ID
+	}
+	return accounts[0].Email
+}
+
+func (s *Service) parseJSDashboardFormat(data []byte) ([]models.Account, string, error) {
 	var rawFile struct {
 		Version     int                     `json:"version"`
 		Accounts    []models.RawAccountData `json:"accounts"`
 		ActiveIndex int                     `json:"activeIndex"`
 	}
 
-	if err := json.Unmarshal(data, &rawFile); err == nil {
-		accounts := make([]models.Account, len(rawFile.Accounts))
-		for i, raw := range rawFile.Accounts {
-			modelAcc := raw.ToAccount()
-
-			accounts[i] = modelAcc
-			accounts[i].ID = modelAcc.ProjectID
-			accounts[i].IsActive = true
-		}
-
-		var activeAccount string
-		if rawFile.ActiveIndex >= 0 && rawFile.ActiveIndex < len(accounts) {
-			activeAccount = accounts[rawFile.ActiveIndex].ID
-		} else if len(accounts) > 0 {
-			activeAccount = accounts[0].ID
-		}
-
-		return accounts, activeAccount, nil
+	if err := json.Unmarshal(data, &rawFile); err != nil {
+		return nil, "", err
 	}
 
-	// 2. Try standard AccountsFile format
-	var accountsFile AccountsFile
-	if err := json.Unmarshal(data, &accountsFile); err == nil {
-		activeAccount := accountsFile.ActiveAccount
+	// Basic validation: if no accounts but no error, it might be an empty file or other format
+	// But json.Unmarshal succeeds on empty lists.
+	// Check if keys match expected structure? json.Unmarshal is permissive.
+	// If Accounts is nil/empty and ActiveIndex is 0, it might be a valid empty file or a mismatch.
+	// Let's assume if Unmarshal succeeds and we have some structure match, it's good.
+	// Actually, if data matches structure, err is nil.
 
-		if activeAccount != "" {
-			found := false
-			for _, acc := range accountsFile.Accounts {
-				if acc.ID == activeAccount || acc.Email == activeAccount {
-					found = true
-					break
-				}
-			}
-			if !found && len(accountsFile.Accounts) > 0 {
-				activeAccount = accountsFile.Accounts[0].ID
-				if activeAccount == "" {
-					activeAccount = accountsFile.Accounts[0].Email
-				}
-			}
-		} else if len(accountsFile.Accounts) > 0 {
-			activeAccount = accountsFile.Accounts[0].ID
-			if activeAccount == "" {
-				activeAccount = accountsFile.Accounts[0].Email
-			}
-		}
-		return accountsFile.Accounts, activeAccount, nil
+	accounts := make([]models.Account, len(rawFile.Accounts))
+	for i, raw := range rawFile.Accounts {
+		modelAcc := raw.ToAccount()
+		accounts[i] = modelAcc
+		accounts[i].ID = modelAcc.ProjectID
+		accounts[i].IsActive = true
 	}
 
-	// 3. Try legacy array format
-	var accounts []models.Account
-	if err := json.Unmarshal(data, &accounts); err == nil {
-		var activeAccount string
-		if len(accounts) > 0 {
-			activeAccount = accounts[0].Email
-		}
-
-		for i := range accounts {
-			if accounts[i].RateLimitResetTimes == nil {
-				accounts[i].RateLimitResetTimes = make(map[string]int64)
-			}
-		}
-		return accounts, activeAccount, nil
+	var activeAccount string
+	if rawFile.ActiveIndex >= 0 && rawFile.ActiveIndex < len(accounts) {
+		activeAccount = accounts[rawFile.ActiveIndex].ID
+	} else if len(accounts) > 0 {
+		activeAccount = accounts[0].ID
 	}
 
-	return nil, "", fmt.Errorf("failed to parse accounts file: invalid format")
+	return accounts, activeAccount, nil
+}
+
+func (s *Service) parseStandardFormat(data []byte) ([]models.Account, string, error) {
+	var accountsFile File
+	if err := json.Unmarshal(data, &accountsFile); err != nil {
+		return nil, "", err
+	}
+
+	// Heuristic: if Accounts is nil and ActiveAccount is empty, maybe it's not this format?
+	// But it could be a valid empty file.
+	// If json.Unmarshal succeeds, we use it. But since we try multiple formats, we need to be careful.
+	// The original code relied on `err == nil`. `json.Unmarshal` will return nil error even if
+	// fields don't match, if the JSON is valid.
+	// However, if the JSON structure is completely different, fields will be zero values.
+
+	activeAccount := accountsFile.ActiveAccount
+	if activeAccount != "" {
+		found := false
+		for _, acc := range accountsFile.Accounts {
+			if acc.ID == activeAccount || acc.Email == activeAccount {
+				found = true
+				break
+			}
+		}
+		if !found && len(accountsFile.Accounts) > 0 {
+			activeAccount = s.getDefaultActiveAccount(accountsFile.Accounts)
+		}
+	} else if len(accountsFile.Accounts) > 0 {
+		activeAccount = s.getDefaultActiveAccount(accountsFile.Accounts)
+	}
+
+	return accountsFile.Accounts, activeAccount, nil
 }
 
 // loadAccounts loads accounts from the JSON file.
@@ -435,7 +479,7 @@ func (s *Service) saveAccounts() error {
 
 // saveAccountsLocked saves accounts to the JSON file (must hold lock).
 func (s *Service) saveAccountsLocked() error {
-	accountsFile := AccountsFile{
+	accountsFile := File{
 		Accounts:      s.accounts,
 		ActiveAccount: s.activeAccount,
 		Version:       1,
@@ -448,7 +492,7 @@ func (s *Service) saveAccountsLocked() error {
 
 	// Write to temp file first, then rename
 	tmpFile := s.filePath + ".tmp"
-	if err := os.WriteFile(tmpFile, data, 0600); err != nil {
+	if err := os.WriteFile(tmpFile, data, 0o600); err != nil {
 		return fmt.Errorf("failed to write temp file: %w", err)
 	}
 

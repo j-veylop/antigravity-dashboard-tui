@@ -273,24 +273,30 @@ var ButtonActiveStyle = ButtonStyle.
 	Foreground(lipgloss.Color("229")).
 	Bold(true)
 
+// ButtonInactiveStyle styles inactive/unfocused buttons.
 var ButtonInactiveStyle = ButtonStyle.
 	Background(BgLight).
 	Foreground(TextSecondary)
 
+// ProjectionSafeStyle styles safe projection status.
 var ProjectionSafeStyle = lipgloss.NewStyle().
 	Foreground(Success)
 
+// ProjectionWarningStyle styles warning projection status.
 var ProjectionWarningStyle = lipgloss.NewStyle().
 	Foreground(Warning).
 	Bold(true)
 
+// ProjectionCriticalStyle styles critical projection status.
 var ProjectionCriticalStyle = lipgloss.NewStyle().
 	Foreground(Error).
 	Bold(true)
 
+// ProjectionUnknownStyle styles unknown projection status.
 var ProjectionUnknownStyle = lipgloss.NewStyle().
 	Foreground(Subtle)
 
+// ProjectionCardStyle styles the projection info card.
 var ProjectionCardStyle = lipgloss.NewStyle().
 	Border(lipgloss.RoundedBorder()).
 	BorderForeground(Secondary).

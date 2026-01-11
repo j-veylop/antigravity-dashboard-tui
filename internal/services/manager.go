@@ -7,6 +7,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/gen2brain/beeep"
 
 	"github.com/j-veylop/antigravity-dashboard-tui/internal/config"
 	"github.com/j-veylop/antigravity-dashboard-tui/internal/db"
@@ -17,26 +18,31 @@ import (
 )
 
 type (
+	// AccountsChangedEvent is emitted when the accounts list changes.
 	AccountsChangedEvent struct {
 		Accounts      []models.Account
 		ActiveAccount *models.Account
 	}
 
+	// QuotaUpdatedEvent is emitted when quota information is updated for an account.
 	QuotaUpdatedEvent struct {
 		AccountEmail string
 		QuotaInfo    *models.QuotaInfo
 	}
 
+	// ProjectionUpdatedEvent is emitted when projections are updated for an account.
 	ProjectionUpdatedEvent struct {
 		Email      string
 		Projection *models.AccountProjection
 	}
 
+	// ErrorEvent is emitted when an error occurs in any service.
 	ErrorEvent struct {
 		Service string
 		Error   error
 	}
 
+	// StatsEvent is emitted when global statistics change.
 	StatsEvent struct {
 		AccountCount   int
 		QuotaCached    int
@@ -45,6 +51,7 @@ type (
 	}
 )
 
+// ServiceEvent is the interface implemented by all service events.
 type ServiceEvent interface {
 	isServiceEvent()
 }
@@ -55,21 +62,25 @@ func (ProjectionUpdatedEvent) isServiceEvent() {}
 func (ErrorEvent) isServiceEvent()             {}
 func (StatsEvent) isServiceEvent()             {}
 
+// Manager orchestrates services and event routing.
 type Manager struct {
-	mu          sync.RWMutex
-	accounts    *accounts.Service
-	quota       *quota.Service
-	projection  *projection.Service
-	database    *db.DB
-	eventChan   chan ServiceEvent
-	stopChan    chan struct{}
-	subscribers []chan<- ServiceEvent
+	mu             sync.RWMutex
+	accounts       *accounts.Service
+	quota          *quota.Service
+	projection     *projection.Service
+	database       *db.DB
+	eventChan      chan ServiceEvent
+	stopChan       chan struct{}
+	subscribers    []chan<- ServiceEvent
+	previousQuotas map[string]*models.QuotaInfo
 }
 
+// NewManager creates a new service manager.
 func NewManager(cfg *config.Config) (*Manager, error) {
 	m := &Manager{
-		eventChan: make(chan ServiceEvent, 100),
-		stopChan:  make(chan struct{}),
+		eventChan:      make(chan ServiceEvent, 100),
+		stopChan:       make(chan struct{}),
+		previousQuotas: make(map[string]*models.QuotaInfo),
 	}
 
 	var err error
@@ -141,6 +152,10 @@ func (m *Manager) handleQuotaEvent(event quota.Event) {
 			QuotaInfo:    event.QuotaInfo,
 		})
 
+		if event.QuotaInfo != nil {
+			m.checkNotifications(event.AccountEmail, event.QuotaInfo)
+		}
+
 		if m.projection != nil && event.QuotaInfo != nil {
 			go m.updateProjection(event.AccountEmail, event.QuotaInfo)
 		}
@@ -150,6 +165,42 @@ func (m *Manager) handleQuotaEvent(event quota.Event) {
 			Service: "quota",
 			Error:   event.Error,
 		})
+	}
+}
+
+func (m *Manager) checkNotifications(email string, newQuota *models.QuotaInfo) {
+	oldQuota, exists := m.previousQuotas[email]
+	m.previousQuotas[email] = newQuota
+
+	if !exists {
+		return
+	}
+
+	// Check for critical quota (< 5%)
+	// Only notify if we crossed the threshold downwards
+	if newQuota.TotalLimit > 0 {
+		newPercent := float64(newQuota.TotalRemaining) / float64(newQuota.TotalLimit) * 100
+		oldPercent := float64(oldQuota.TotalRemaining) / float64(oldQuota.TotalLimit) * 100
+
+		if newPercent < 5.0 && oldPercent >= 5.0 {
+			title := fmt.Sprintf("Critical Quota: %s", email)
+			body := fmt.Sprintf("Remaining quota is below 5%% (%.1f%%)", newPercent)
+			_ = beeep.Notify(title, body, "")
+		}
+	}
+
+	// Check for reset (significant increase)
+	// If remaining increases by more than 20% of limit
+	if newQuota.TotalRemaining > oldQuota.TotalRemaining {
+		diff := newQuota.TotalRemaining - oldQuota.TotalRemaining
+		if newQuota.TotalLimit > 0 {
+			percentDiff := float64(diff) / float64(newQuota.TotalLimit) * 100
+			if percentDiff > 20.0 {
+				title := fmt.Sprintf("Quota Reset: %s", email)
+				body := "Your quota has been refreshed."
+				_ = beeep.Notify(title, body, "")
+			}
+		}
 	}
 }
 
@@ -164,12 +215,13 @@ func (m *Manager) updateProjection(email string, quotaInfo *models.QuotaInfo) {
 		if mq.Limit > 0 {
 			percent = float64(mq.Remaining) / float64(mq.Limit) * 100
 		}
-		if mq.ModelFamily == "claude" {
+		switch mq.ModelFamily {
+		case "claude":
 			if claudePercent == 0 || percent < claudePercent {
 				claudePercent = percent
 				claudeReset = mq.ResetTime
 			}
-		} else if mq.ModelFamily == "gemini" {
+		case "gemini":
 			if geminiPercent == 0 || percent < geminiPercent {
 				geminiPercent = percent
 				geminiReset = mq.ResetTime
@@ -293,14 +345,17 @@ func (m *Manager) Accounts() *accounts.Service {
 	return m.accounts
 }
 
+// Quota returns the quota service.
 func (m *Manager) Quota() *quota.Service {
 	return m.quota
 }
 
+// Projection returns the projection service.
 func (m *Manager) Projection() *projection.Service {
 	return m.projection
 }
 
+// GetAllProjections returns all projections.
 func (m *Manager) GetAllProjections() map[string]*models.AccountProjection {
 	if m.projection == nil {
 		return nil
@@ -321,6 +376,7 @@ func (m *Manager) Database() *db.DB {
 	return m.database
 }
 
+// Close closes the manager and all its services.
 func (m *Manager) Close() error {
 	close(m.stopChan)
 

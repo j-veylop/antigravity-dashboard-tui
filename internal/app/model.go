@@ -90,96 +90,50 @@ type KeyMap struct {
 
 // DefaultKeyMap returns the default keybindings.
 func DefaultKeyMap() KeyMap {
-	return KeyMap{
-		Tab1: key.NewBinding(
-			key.WithKeys("1"),
-			key.WithHelp("1", "dashboard"),
-		),
-		Tab2: key.NewBinding(
-			key.WithKeys("2"),
-			key.WithHelp("2", "history"),
-		),
-		Tab3: key.NewBinding(
-			key.WithKeys("3"),
-			key.WithHelp("3", "info"),
-		),
-		NextTab: key.NewBinding(
-			key.WithKeys("tab", "l", "right"),
-			key.WithHelp("tab/→", "next tab"),
-		),
-		PrevTab: key.NewBinding(
-			key.WithKeys("shift+tab", "h", "left"),
-			key.WithHelp("shift+tab/←", "prev tab"),
-		),
-		Refresh: key.NewBinding(
-			key.WithKeys("r", "ctrl+r"),
-			key.WithHelp("r", "refresh"),
-		),
-		Help: key.NewBinding(
-			key.WithKeys("?"),
-			key.WithHelp("?", "toggle help"),
-		),
-		Quit: key.NewBinding(
-			key.WithKeys("q", "ctrl+c"),
-			key.WithHelp("q", "quit"),
-		),
-		Up: key.NewBinding(
-			key.WithKeys("up", "k"),
-			key.WithHelp("↑/k", "up"),
-		),
-		Down: key.NewBinding(
-			key.WithKeys("down", "j"),
-			key.WithHelp("↓/j", "down"),
-		),
-		Left: key.NewBinding(
-			key.WithKeys("left", "h"),
-			key.WithHelp("←/h", "left"),
-		),
-		Right: key.NewBinding(
-			key.WithKeys("right", "l"),
-			key.WithHelp("→/l", "right"),
-		),
-		Enter: key.NewBinding(
-			key.WithKeys("enter"),
-			key.WithHelp("enter", "select"),
-		),
-		Escape: key.NewBinding(
-			key.WithKeys("esc"),
-			key.WithHelp("esc", "cancel"),
-		),
-		PageUp: key.NewBinding(
-			key.WithKeys("pgup", "ctrl+u"),
-			key.WithHelp("pgup", "page up"),
-		),
-		PageDown: key.NewBinding(
-			key.WithKeys("pgdown", "ctrl+d"),
-			key.WithHelp("pgdn", "page down"),
-		),
-		Home: key.NewBinding(
-			key.WithKeys("home", "g"),
-			key.WithHelp("home", "go to top"),
-		),
-		End: key.NewBinding(
-			key.WithKeys("end", "G"),
-			key.WithHelp("end", "go to bottom"),
-		),
-		Filter: key.NewBinding(
-			key.WithKeys("/"),
-			key.WithHelp("/", "filter"),
-		),
-		Copy: key.NewBinding(
-			key.WithKeys("c", "ctrl+c"),
-			key.WithHelp("c", "copy"),
-		),
-		Delete: key.NewBinding(
-			key.WithKeys("d", "delete"),
-			key.WithHelp("d", "delete"),
-		),
-		SwitchFocus: key.NewBinding(
-			key.WithKeys("tab"),
-			key.WithHelp("tab", "switch focus"),
-		),
-	}
+	km := KeyMap{}
+	km = setTabKeys(km)
+	km = setActionKeys(km)
+	km = setNavigationKeys(km)
+	km = setListKeys(km)
+	return km
+}
+
+func setTabKeys(k KeyMap) KeyMap {
+	k.Tab1 = key.NewBinding(key.WithKeys("1"), key.WithHelp("1", "dashboard"))
+	k.Tab2 = key.NewBinding(key.WithKeys("2"), key.WithHelp("2", "history"))
+	k.Tab3 = key.NewBinding(key.WithKeys("3"), key.WithHelp("3", "info"))
+	k.NextTab = key.NewBinding(key.WithKeys("tab", "l", "right"), key.WithHelp("tab/→", "next tab"))
+	k.PrevTab = key.NewBinding(key.WithKeys("shift+tab", "h", "left"), key.WithHelp("shift+tab/←", "prev tab"))
+	return k
+}
+
+func setActionKeys(k KeyMap) KeyMap {
+	k.Refresh = key.NewBinding(key.WithKeys("r", "ctrl+r"), key.WithHelp("r", "refresh"))
+	k.Help = key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "toggle help"))
+	k.Quit = key.NewBinding(key.WithKeys("q", "ctrl+c"), key.WithHelp("q", "quit"))
+	k.Copy = key.NewBinding(key.WithKeys("c", "ctrl+c"), key.WithHelp("c", "copy"))
+	k.Delete = key.NewBinding(key.WithKeys("d", "delete"), key.WithHelp("d", "delete"))
+	return k
+}
+
+func setNavigationKeys(k KeyMap) KeyMap {
+	k.Up = key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("↑/k", "up"))
+	k.Down = key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("↓/j", "down"))
+	k.Left = key.NewBinding(key.WithKeys("left", "h"), key.WithHelp("←/h", "left"))
+	k.Right = key.NewBinding(key.WithKeys("right", "l"), key.WithHelp("→/l", "right"))
+	k.Enter = key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "select"))
+	k.Escape = key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "cancel"))
+	k.SwitchFocus = key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "switch focus"))
+	return k
+}
+
+func setListKeys(k KeyMap) KeyMap {
+	k.PageUp = key.NewBinding(key.WithKeys("pgup", "ctrl+u"), key.WithHelp("pgup", "page up"))
+	k.PageDown = key.NewBinding(key.WithKeys("pgdown", "ctrl+d"), key.WithHelp("pgdn", "page down"))
+	k.Home = key.NewBinding(key.WithKeys("home", "g"), key.WithHelp("home", "go to top"))
+	k.End = key.NewBinding(key.WithKeys("end", "G"), key.WithHelp("end", "go to bottom"))
+	k.Filter = key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "filter"))
+	return k
 }
 
 // ShortHelp returns key bindings for the short help view.
@@ -235,74 +189,31 @@ func DefaultStyles() Styles {
 	errorColor := lipgloss.AdaptiveColor{Light: "#FF5F87", Dark: "#FF5F87"}
 	info := lipgloss.AdaptiveColor{Light: "#0087D7", Dark: "#5FAFFF"}
 
-	return Styles{
-		TabBar: lipgloss.NewStyle().
-			Padding(0, 1).
-			BorderStyle(lipgloss.NormalBorder()).
-			BorderBottom(true).
-			BorderForeground(subtle),
+	s := Styles{}
+	s.TabBar = lipgloss.NewStyle().Padding(0, 1).BorderStyle(lipgloss.NormalBorder()).
+		BorderBottom(true).BorderForeground(subtle)
+	s.ActiveTab = lipgloss.NewStyle().Bold(true).Foreground(highlight).Padding(0, 2)
+	s.InactiveTab = lipgloss.NewStyle().Foreground(subtle).Padding(0, 2)
+	s.TabSeparator = lipgloss.NewStyle().Foreground(subtle).SetString(" | ")
 
-		ActiveTab: lipgloss.NewStyle().
-			Bold(true).
-			Foreground(highlight).
-			Padding(0, 2),
+	s.NotificationSuccess = lipgloss.NewStyle().Foreground(success).Padding(0, 1)
+	s.NotificationError = lipgloss.NewStyle().Foreground(errorColor).Bold(true).Padding(0, 1)
+	s.NotificationWarning = lipgloss.NewStyle().Foreground(warning).Padding(0, 1)
+	s.NotificationInfo = lipgloss.NewStyle().Foreground(info).Padding(0, 1)
 
-		InactiveTab: lipgloss.NewStyle().
-			Foreground(subtle).
-			Padding(0, 2),
+	s.Content = lipgloss.NewStyle().Padding(1, 2)
+	s.Help = lipgloss.NewStyle().Foreground(subtle).Padding(0, 1)
+	s.Spinner = lipgloss.NewStyle().Foreground(highlight)
+	s.Toast = styles.ToastStyle
 
-		TabSeparator: lipgloss.NewStyle().
-			Foreground(subtle).
-			SetString(" | "),
+	s.Title = lipgloss.NewStyle().Bold(true).Foreground(highlight)
+	s.Subtle = lipgloss.NewStyle().Foreground(subtle)
+	s.Highlight = lipgloss.NewStyle().Foreground(highlight)
+	s.Error = lipgloss.NewStyle().Foreground(errorColor)
+	s.Success = lipgloss.NewStyle().Foreground(success)
+	s.Warning = lipgloss.NewStyle().Foreground(warning)
 
-		NotificationSuccess: lipgloss.NewStyle().
-			Foreground(success).
-			Padding(0, 1),
-
-		NotificationError: lipgloss.NewStyle().
-			Foreground(errorColor).
-			Bold(true).
-			Padding(0, 1),
-
-		NotificationWarning: lipgloss.NewStyle().
-			Foreground(warning).
-			Padding(0, 1),
-
-		NotificationInfo: lipgloss.NewStyle().
-			Foreground(info).
-			Padding(0, 1),
-
-		Content: lipgloss.NewStyle().
-			Padding(1, 2),
-
-		Help: lipgloss.NewStyle().
-			Foreground(subtle).
-			Padding(0, 1),
-
-		Spinner: lipgloss.NewStyle().
-			Foreground(highlight),
-
-		Toast: styles.ToastStyle,
-
-		Title: lipgloss.NewStyle().
-			Bold(true).
-			Foreground(highlight),
-
-		Subtle: lipgloss.NewStyle().
-			Foreground(subtle),
-
-		Highlight: lipgloss.NewStyle().
-			Foreground(highlight),
-
-		Error: lipgloss.NewStyle().
-			Foreground(errorColor),
-
-		Success: lipgloss.NewStyle().
-			Foreground(success),
-
-		Warning: lipgloss.NewStyle().
-			Foreground(warning),
-	}
+	return s
 }
 
 // Model is the main application model.
@@ -313,7 +224,7 @@ type Model struct {
 	tabNames  []string
 
 	// Shared state
-	state    *AppState
+	state    *State
 	services *services.Manager
 	commands *Commands
 	keymap   KeyMap
@@ -342,7 +253,7 @@ func NewModel(mgr *services.Manager) *Model {
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 
 	// Create shared state
-	state := NewAppState()
+	state := NewState()
 
 	// Create model
 	m := &Model{
@@ -371,7 +282,7 @@ func (m *Model) SetTabs(tabs []Tab) {
 }
 
 // GetState returns the application state.
-func (m *Model) GetState() *AppState {
+func (m *Model) GetState() *State {
 	return m.state
 }
 
@@ -443,14 +354,39 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg, tea.KeyMsg, spinner.TickMsg:
+		if cmd := m.handleTeaMsg(msg); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+
+	default:
+		if appCmds := m.handleAppMsg(msg); len(appCmds) > 0 {
+			cmds = append(cmds, appCmds...)
+		}
+	}
+
+	if cmd := m.updateActiveTab(msg); cmd != nil {
+		cmds = append(cmds, cmd)
+	}
+
+	return m, tea.Batch(cmds...)
+}
+
+func (m *Model) handleTeaMsg(msg tea.Msg) tea.Cmd {
+	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.handleWindowSize(msg)
 	case tea.KeyMsg:
-		if cmd := m.handleKeyMsg(msg); cmd != nil {
-			cmds = append(cmds, cmd)
-		}
+		return m.handleKeyMsg(msg)
 	case spinner.TickMsg:
-		cmds = append(cmds, m.handleSpinnerTick(msg))
+		return m.handleSpinnerTick(msg)
+	}
+	return nil
+}
+
+func (m *Model) handleAppMsg(msg tea.Msg) []tea.Cmd {
+	var cmds []tea.Cmd
+	switch msg := msg.(type) {
 	case TickMsg:
 		cmds = append(cmds, m.handleTick())
 	case SubscriptionEventMsg:
@@ -487,12 +423,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ToggleHelpMsg:
 		m.showHelp = !m.showHelp
 	}
-
-	if cmd := m.updateActiveTab(msg); cmd != nil {
-		cmds = append(cmds, cmd)
-	}
-
-	return m, tea.Batch(cmds...)
+	return cmds
 }
 
 func (m *Model) handleWindowSize(msg tea.WindowSizeMsg) {

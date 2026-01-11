@@ -11,8 +11,11 @@ import (
 type SubscriptionTier string
 
 const (
-	TierFree    SubscriptionTier = "FREE"
-	TierPro     SubscriptionTier = "PRO"
+	// TierFree represents the free subscription tier.
+	TierFree SubscriptionTier = "FREE"
+	// TierPro represents the paid pro subscription tier.
+	TierPro SubscriptionTier = "PRO"
+	// TierUnknown represents an unknown subscription tier.
 	TierUnknown SubscriptionTier = "UNKNOWN"
 )
 
@@ -63,9 +66,10 @@ func GetTierFromQuotas(quotas []models.ModelQuota) SubscriptionTier {
 		}
 
 		hasValid = true
-		if tier == TierPro {
+		switch tier {
+		case TierPro:
 			hasPro = true
-		} else if tier == TierFree {
+		case TierFree:
 			hasFree = true
 		}
 	}
@@ -98,7 +102,7 @@ func TimeUntilReset(resetTime time.Time) time.Duration {
 	if resetTime.IsZero() {
 		return 0
 	}
-	duration := resetTime.Sub(time.Now())
+	duration := time.Until(resetTime)
 	if duration < 0 {
 		return 0
 	}

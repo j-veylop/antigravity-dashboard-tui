@@ -13,6 +13,7 @@ import (
 	"github.com/j-veylop/antigravity-dashboard-tui/internal/ui/styles"
 )
 
+// View renders the dashboard component.
 func (m *Model) View() string {
 	if m.state.IsInitialLoading() {
 		return m.renderLoading()
@@ -66,7 +67,7 @@ func (m *Model) renderQuotaList() string {
 		emptyIcon := lipgloss.NewStyle().Foreground(styles.Subtle).Render("○")
 		rows = append(rows, fmt.Sprintf("  %s %s", emptyIcon, styles.HelpStyle.Render("No accounts configured")))
 		rows = append(rows, "")
-		rows = append(rows, styles.InfoTextStyle.Render("  ╰─▶ Add accounts via the Accounts tab"))
+		rows = append(rows, styles.InfoTextStyle.Render("  ╰─▶ Add accounts by editing accounts.json"))
 
 		return styles.CardStyle.Width(cardWidth).Render(
 			lipgloss.JoinVertical(lipgloss.Left, rows...),
@@ -103,6 +104,28 @@ func (m *Model) renderQuotaList() string {
 func (m *Model) renderAccountRow(acc models.AccountWithQuota, selected bool, width int) string {
 	var lines []string
 
+	lines = append(lines, m.renderAccountHeader(acc, selected))
+	lines = append(lines, "")
+
+	// Quota bars
+	contentWidth := width - 4
+	if contentWidth < 20 {
+		contentWidth = 20
+	}
+
+	switch {
+	case acc.QuotaInfo == nil:
+		lines = append(lines, m.renderAccountLoading(contentWidth)...)
+	case acc.QuotaInfo.Error != "":
+		lines = append(lines, m.renderAccountError(acc, contentWidth)...)
+	default:
+		lines = append(lines, m.renderAccountQuotas(acc, contentWidth)...)
+	}
+
+	return lipgloss.JoinVertical(lipgloss.Left, lines...)
+}
+
+func (m *Model) renderAccountHeader(acc models.AccountWithQuota, selected bool) string {
 	activeIndicator := lipgloss.NewStyle().Foreground(styles.Subtle).Render("○ ")
 	if acc.IsActive {
 		activeIndicator = styles.SuccessTextStyle.Render("● ")
@@ -113,7 +136,7 @@ func (m *Model) renderAccountRow(acc models.AccountWithQuota, selected bool, wid
 		selectionPrefix = styles.FocusedStyle.Render("▸ ")
 	}
 
-	email := acc.Account.Email
+	email := acc.Email
 	if len(email) > 35 {
 		email = email[:32] + "..."
 	}
@@ -129,151 +152,177 @@ func (m *Model) renderAccountRow(acc models.AccountWithQuota, selected bool, wid
 		}
 	}
 
-	header := fmt.Sprintf("%s%s%s %s",
+	return fmt.Sprintf("%s%s%s %s",
 		selectionPrefix,
 		activeIndicator,
 		lipgloss.NewStyle().Bold(true).Render(email),
 		tierStyle.Render(tierIcon+" "+tier),
 	)
-	lines = append(lines, header)
-	lines = append(lines, "")
+}
 
-	// Quota bars
-	contentWidth := width - 4
-	if contentWidth < 20 {
-		contentWidth = 20
-	}
+func (m *Model) renderAccountQuotas(acc models.AccountWithQuota, width int) []string {
+	var lines []string
+	proj := m.state.GetProjection(acc.Email)
+	tier := acc.QuotaInfo.SubscriptionTier
 
-	proj := m.state.GetProjection(acc.Account.Email)
+	claudePercent, geminiPercent, claudeResetSec, geminiResetSec := m.calculateDisplayQuotas(acc.QuotaInfo)
+
 	var claudeProj, geminiProj *models.ModelProjection
 	if proj != nil {
 		claudeProj = proj.Claude
 		geminiProj = proj.Gemini
 	}
 
-	if acc.QuotaInfo != nil && acc.QuotaInfo.Error == "" {
-		claudePercent := -1.0
-		geminiPercent := -1.0
-		claudeResetSec := int64(0)
-		geminiResetSec := int64(0)
+	if claudePercent >= 0 {
+		lines = append(lines, m.renderModelQuota(
+			"Claude", "⬡", "#cc785c", acc.Email+":claude", claudePercent, width, claudeResetSec, tier, claudeProj)...)
+	}
 
-		for _, mq := range acc.QuotaInfo.ModelQuotas {
-			if mq.ModelFamily == "claude" {
-				currentPercent := 0.0
-				if mq.Limit > 0 && !mq.IsRateLimited {
-					currentPercent = float64(mq.Remaining) / float64(mq.Limit) * 100
-				}
-
-				if claudePercent < 0 || currentPercent < claudePercent {
-					claudePercent = currentPercent
-					if !mq.ResetTime.IsZero() {
-						claudeResetSec = int64(time.Until(mq.ResetTime).Seconds())
-						if claudeResetSec < 0 {
-							claudeResetSec = 0
-						}
-					}
-				}
-			} else if mq.ModelFamily == "gemini" {
-				currentPercent := 0.0
-				if mq.Limit > 0 && !mq.IsRateLimited {
-					currentPercent = float64(mq.Remaining) / float64(mq.Limit) * 100
-				}
-
-				if geminiPercent < 0 || currentPercent < geminiPercent {
-					geminiPercent = currentPercent
-					if !mq.ResetTime.IsZero() {
-						geminiResetSec = int64(time.Until(mq.ResetTime).Seconds())
-						if geminiResetSec < 0 {
-							geminiResetSec = 0
-						}
-					}
-				}
-			}
-		}
-
-		if claudePercent >= 0 {
-			claudeIcon := lipgloss.NewStyle().Foreground(lipgloss.Color("#cc785c")).Render("⬡")
-			claudeLabel := lipgloss.NewStyle().Foreground(lipgloss.Color("#cc785c")).Bold(true).Render("Claude")
-			lines = append(lines, fmt.Sprintf("  %s %s", claudeIcon, claudeLabel))
-
-			animKey := acc.Account.Email + ":claude"
-			displayPercent := claudePercent
-			if anim, ok := m.animations[animKey]; ok {
-				displayPercent = anim.CurrentPercent
-			}
-			block := m.renderQuotaBarWithTime(displayPercent, contentWidth, claudeResetSec, tier, claudeProj)
-			lines = append(lines, block)
-		}
-
-		if claudePercent >= 0 && geminiPercent >= 0 {
-			lines = append(lines, "")
-		}
-
-		if geminiPercent >= 0 {
-			geminiIcon := lipgloss.NewStyle().Foreground(lipgloss.Color("#4285f4")).Render("◎")
-			geminiLabel := lipgloss.NewStyle().Foreground(lipgloss.Color("#4285f4")).Bold(true).Render("Gemini")
-			lines = append(lines, fmt.Sprintf("  %s %s", geminiIcon, geminiLabel))
-
-			animKey := acc.Account.Email + ":gemini"
-			displayPercent := geminiPercent
-			if anim, ok := m.animations[animKey]; ok {
-				displayPercent = anim.CurrentPercent
-			}
-			block := m.renderQuotaBarWithTime(displayPercent, contentWidth, geminiResetSec, tier, geminiProj)
-			lines = append(lines, block)
-		}
-
-		if acc.QuotaInfo != nil && acc.QuotaInfo.TotalLimit > 0 {
-			lines = append(lines, "")
-			totalPercent := float64(acc.QuotaInfo.TotalRemaining) / float64(acc.QuotaInfo.TotalLimit) * 100
-			totalIcon := lipgloss.NewStyle().Foreground(styles.Primary).Render("◈")
-			totalLabel := lipgloss.NewStyle().Foreground(styles.Primary).Bold(true).Render("Total Quota Left")
-			lines = append(lines, fmt.Sprintf("  %s %s", totalIcon, totalLabel))
-			block := m.renderTotalBar(totalPercent, contentWidth)
-			lines = append(lines, block)
-		}
-	} else if acc.QuotaInfo != nil && acc.QuotaInfo.Error != "" {
-		claudeIcon := lipgloss.NewStyle().Foreground(lipgloss.Color("#cc785c")).Render("⬡")
-		claudeLabel := lipgloss.NewStyle().Foreground(lipgloss.Color("#cc785c")).Bold(true).Render("Claude")
-		lines = append(lines, fmt.Sprintf("  %s %s", claudeIcon, claudeLabel))
-		block1 := m.renderQuotaBarWithTime(0, contentWidth, 0, tier, nil)
-		lines = append(lines, block1)
-
+	if claudePercent >= 0 && geminiPercent >= 0 {
 		lines = append(lines, "")
+	}
 
-		geminiIcon := lipgloss.NewStyle().Foreground(lipgloss.Color("#4285f4")).Render("◎")
-		geminiLabel := lipgloss.NewStyle().Foreground(lipgloss.Color("#4285f4")).Bold(true).Render("Gemini")
-		lines = append(lines, fmt.Sprintf("  %s %s", geminiIcon, geminiLabel))
-		block2 := m.renderQuotaBarWithTime(0, contentWidth, 0, tier, nil)
-		lines = append(lines, block2)
-	} else {
-		claudeIcon := lipgloss.NewStyle().Foreground(lipgloss.Color("#cc785c")).Render("⬡")
-		claudeLabel := lipgloss.NewStyle().Foreground(lipgloss.Color("#cc785c")).Bold(true).Render("Claude")
-		lines = append(lines, fmt.Sprintf("  %s %s", claudeIcon, claudeLabel))
-		block1 := m.renderLoadingBar("claude", contentWidth)
-		lines = append(lines, block1)
+	if geminiPercent >= 0 {
+		lines = append(lines, m.renderModelQuota(
+			"Gemini", "◎", "#4285f4", acc.Email+":gemini", geminiPercent, width, geminiResetSec, tier, geminiProj)...)
+	}
 
+	if acc.QuotaInfo.TotalLimit > 0 {
 		lines = append(lines, "")
-
-		geminiIcon := lipgloss.NewStyle().Foreground(lipgloss.Color("#4285f4")).Render("◎")
-		geminiLabel := lipgloss.NewStyle().Foreground(lipgloss.Color("#4285f4")).Bold(true).Render("Gemini")
-		lines = append(lines, fmt.Sprintf("  %s %s", geminiIcon, geminiLabel))
-		block2 := m.renderLoadingBar("gemini", contentWidth)
-		lines = append(lines, block2)
-
-		lines = append(lines, "")
-
+		totalPercent := float64(acc.QuotaInfo.TotalRemaining) / float64(acc.QuotaInfo.TotalLimit) * 100
 		totalIcon := lipgloss.NewStyle().Foreground(styles.Primary).Render("◈")
 		totalLabel := lipgloss.NewStyle().Foreground(styles.Primary).Bold(true).Render("Total Quota Left")
 		lines = append(lines, fmt.Sprintf("  %s %s", totalIcon, totalLabel))
-		block3 := m.renderLoadingTotalBar(contentWidth)
-		lines = append(lines, block3)
+		block := m.renderTotalBar(totalPercent, width)
+		lines = append(lines, block)
 	}
 
-	return lipgloss.JoinVertical(lipgloss.Left, lines...)
+	return lines
 }
 
-func (m *Model) renderQuotaBarWithTime(percent float64, width int, resetSec int64, tier string, proj *models.ModelProjection) string {
+func (m *Model) calculateDisplayQuotas(
+	quotaInfo *models.QuotaInfo,
+) (claudePercent, geminiPercent float64, claudeResetSec, geminiResetSec int64) {
+	claudePercent = -1.0
+	geminiPercent = -1.0
+	claudeResetSec = 0
+	geminiResetSec = 0
+
+	for _, mq := range quotaInfo.ModelQuotas {
+		switch mq.ModelFamily {
+		case "claude":
+			currentPercent := 0.0
+			if mq.Limit > 0 && !mq.IsRateLimited {
+				currentPercent = float64(mq.Remaining) / float64(mq.Limit) * 100
+			}
+
+			if claudePercent < 0 || currentPercent < claudePercent {
+				claudePercent = currentPercent
+				if !mq.ResetTime.IsZero() {
+					claudeResetSec = int64(time.Until(mq.ResetTime).Seconds())
+					if claudeResetSec < 0 {
+						claudeResetSec = 0
+					}
+				}
+			}
+		case "gemini":
+			currentPercent := 0.0
+			if mq.Limit > 0 && !mq.IsRateLimited {
+				currentPercent = float64(mq.Remaining) / float64(mq.Limit) * 100
+			}
+
+			if geminiPercent < 0 || currentPercent < geminiPercent {
+				geminiPercent = currentPercent
+				if !mq.ResetTime.IsZero() {
+					geminiResetSec = int64(time.Until(mq.ResetTime).Seconds())
+					if geminiResetSec < 0 {
+						geminiResetSec = 0
+					}
+				}
+			}
+		}
+	}
+	return claudePercent, geminiPercent, claudeResetSec, geminiResetSec
+}
+
+func (m *Model) renderModelQuota(
+	label, icon, colorHex, animKey string,
+	percent float64,
+	width int,
+	resetSec int64,
+	tier string,
+	proj *models.ModelProjection,
+) []string {
+	var lines []string
+	iconStr := lipgloss.NewStyle().Foreground(lipgloss.Color(colorHex)).Render(icon)
+	labelStr := lipgloss.NewStyle().Foreground(lipgloss.Color(colorHex)).Bold(true).Render(label)
+	lines = append(lines, fmt.Sprintf("  %s %s", iconStr, labelStr))
+
+	displayPercent := percent
+	if anim, ok := m.animations[animKey]; ok {
+		displayPercent = anim.CurrentPercent
+	}
+	block := m.renderQuotaBarWithTime(displayPercent, width, resetSec, tier, proj)
+	lines = append(lines, block)
+	return lines
+}
+
+func (m *Model) renderAccountError(acc models.AccountWithQuota, width int) []string {
+	var lines []string
+	tier := acc.QuotaInfo.SubscriptionTier
+
+	claudeIcon := lipgloss.NewStyle().Foreground(lipgloss.Color("#cc785c")).Render("⬡")
+	claudeLabel := lipgloss.NewStyle().Foreground(lipgloss.Color("#cc785c")).Bold(true).Render("Claude")
+	lines = append(lines, fmt.Sprintf("  %s %s", claudeIcon, claudeLabel))
+	block1 := m.renderQuotaBarWithTime(0, width, 0, tier, nil)
+	lines = append(lines, block1)
+
+	lines = append(lines, "")
+
+	geminiIcon := lipgloss.NewStyle().Foreground(lipgloss.Color("#4285f4")).Render("◎")
+	geminiLabel := lipgloss.NewStyle().Foreground(lipgloss.Color("#4285f4")).Bold(true).Render("Gemini")
+	lines = append(lines, fmt.Sprintf("  %s %s", geminiIcon, geminiLabel))
+	block2 := m.renderQuotaBarWithTime(0, width, 0, tier, nil)
+	lines = append(lines, block2)
+
+	return lines
+}
+
+func (m *Model) renderAccountLoading(width int) []string {
+	var lines []string
+
+	claudeIcon := lipgloss.NewStyle().Foreground(lipgloss.Color("#cc785c")).Render("⬡")
+	claudeLabel := lipgloss.NewStyle().Foreground(lipgloss.Color("#cc785c")).Bold(true).Render("Claude")
+	lines = append(lines, fmt.Sprintf("  %s %s", claudeIcon, claudeLabel))
+	block1 := m.renderLoadingBar("claude", width)
+	lines = append(lines, block1)
+
+	lines = append(lines, "")
+
+	geminiIcon := lipgloss.NewStyle().Foreground(lipgloss.Color("#4285f4")).Render("◎")
+	geminiLabel := lipgloss.NewStyle().Foreground(lipgloss.Color("#4285f4")).Bold(true).Render("Gemini")
+	lines = append(lines, fmt.Sprintf("  %s %s", geminiIcon, geminiLabel))
+	block2 := m.renderLoadingBar("gemini", width)
+	lines = append(lines, block2)
+
+	lines = append(lines, "")
+
+	totalIcon := lipgloss.NewStyle().Foreground(styles.Primary).Render("◈")
+	totalLabel := lipgloss.NewStyle().Foreground(styles.Primary).Bold(true).Render("Total Quota Left")
+	lines = append(lines, fmt.Sprintf("  %s %s", totalIcon, totalLabel))
+	block3 := m.renderLoadingTotalBar(width)
+	lines = append(lines, block3)
+
+	return lines
+}
+
+func (m *Model) renderQuotaBarWithTime(
+	percent float64,
+	width int,
+	resetSec int64,
+	tier string,
+	proj *models.ModelProjection,
+) string {
 	const (
 		indentWidth  = 4
 		percentWidth = 6
@@ -287,11 +336,23 @@ func (m *Model) renderQuotaBarWithTime(percent float64, width int, resetSec int6
 		barWidth = 10
 	}
 
-	timeWidth := percentWidth
-	depleteWidth := rateWidth + badgeWidth
+	line1 := m.renderQuotaBarFirstLine(percent, barWidth, percentWidth, rateWidth, badgeWidth, proj)
 
-	indent := "    "
+	if resetSec > 0 {
+		line2 := m.renderQuotaBarSecondLine(barWidth, percentWidth, rateWidth, badgeWidth, resetSec, tier, proj)
+		return lipgloss.JoinVertical(lipgloss.Left, line1, line2)
+	}
 
+	return line1
+}
+
+const indentSpace = "    "
+
+func (m *Model) renderQuotaBarFirstLine(
+	percent float64,
+	barWidth, percentWidth, rateWidth, badgeWidth int,
+	proj *models.ModelProjection,
+) string {
 	percentStr := styles.GetQuotaStyle(percent, false).
 		Width(percentWidth).
 		Align(lipgloss.Right).
@@ -300,9 +361,10 @@ func (m *Model) renderQuotaBarWithTime(percent float64, width int, resetSec int6
 	rateStr := ""
 	if proj != nil && proj.SessionRate > 0 {
 		rateStyle := styles.HelpStyle
-		if proj.Status == models.ProjectionWarning {
+		switch proj.Status {
+		case models.ProjectionWarning:
 			rateStyle = styles.WarningTextStyle
-		} else if proj.Status == models.ProjectionCritical {
+		case models.ProjectionCritical:
 			rateStyle = styles.ErrorTextStyle
 		}
 		rateStr = rateStyle.Width(rateWidth).Align(lipgloss.Right).Render(fmt.Sprintf("%.1f%%/hr", proj.SessionRate))
@@ -333,8 +395,8 @@ func (m *Model) renderQuotaBarWithTime(percent float64, width int, resetSec int6
 
 	bar1 := components.RenderGradientBar(percent, barWidth)
 
-	line1 := lipgloss.JoinHorizontal(lipgloss.Left,
-		indent,
+	return lipgloss.JoinHorizontal(lipgloss.Left,
+		indentSpace,
 		bar1,
 		" ",
 		percentStr,
@@ -343,71 +405,78 @@ func (m *Model) renderQuotaBarWithTime(percent float64, width int, resetSec int6
 		" ",
 		badgeStr,
 	)
+}
 
-	if resetSec > 0 {
-		const hourInSeconds int64 = 3600
-		const dayInSeconds int64 = 86400
-		const proPeriodSeconds int64 = 5 * 3600
+func (m *Model) renderQuotaBarSecondLine(
+	barWidth, timeWidth, rateWidth, badgeWidth int,
+	resetSec int64,
+	tier string,
+	proj *models.ModelProjection,
+) string {
+	period := m.calculatePeriod(tier, resetSec)
 
-		var period int64
-		if tier == "PRO" {
-			period = proPeriodSeconds
-		} else if resetSec <= hourInSeconds {
-			period = hourInSeconds
-		} else {
-			period = dayInSeconds
+	timePercent := 1.0
+	if period > 0 {
+		timePercent = 1.0 - (float64(resetSec) / float64(period))
+		if timePercent < 0 {
+			timePercent = 0
 		}
-
-		timePercent := 1.0
-		if period > 0 {
-			timePercent = 1.0 - (float64(resetSec) / float64(period))
-			if timePercent < 0 {
-				timePercent = 0
-			}
-			if timePercent > 1 {
-				timePercent = 1
-			}
+		if timePercent > 1 {
+			timePercent = 1
 		}
-
-		resetTimeText := formatDuration(float64(resetSec) / 3600.0)
-		resetTimeStr := lipgloss.NewStyle().
-			Foreground(styles.TextSecondary).
-			Width(timeWidth).
-			Align(lipgloss.Right).
-			Render(resetTimeText)
-
-		depleteStr := ""
-		if proj != nil && proj.SessionRate > 0 && !math.IsInf(proj.SessionHoursLeft, 0) {
-			depleteText := fmt.Sprintf("(Depletes: %s)", formatDuration(proj.SessionHoursLeft))
-			if len(depleteText) > depleteWidth {
-				depleteText = depleteText[:depleteWidth-1] + ")"
-			}
-			depleteStyle := styles.HelpStyle
-			if proj.Status == models.ProjectionCritical {
-				depleteStyle = styles.ErrorTextStyle
-			} else if proj.Status == models.ProjectionWarning {
-				depleteStyle = styles.WarningTextStyle
-			}
-			depleteStr = depleteStyle.Width(depleteWidth).Align(lipgloss.Right).Render(depleteText)
-		} else {
-			depleteStr = lipgloss.NewStyle().Width(depleteWidth).Render("")
-		}
-
-		bar2 := components.RenderTimeBarChars(timePercent, barWidth)
-
-		line2 := lipgloss.JoinHorizontal(lipgloss.Left,
-			indent,
-			bar2,
-			" ",
-			resetTimeStr,
-			" ",
-			depleteStr,
-		)
-
-		return lipgloss.JoinVertical(lipgloss.Left, line1, line2)
 	}
 
-	return line1
+	resetTimeText := formatDuration(float64(resetSec) / 3600.0)
+	resetTimeStr := lipgloss.NewStyle().
+		Foreground(styles.TextSecondary).
+		Width(timeWidth).
+		Align(lipgloss.Right).
+		Render(resetTimeText)
+
+	depleteWidth := rateWidth + badgeWidth
+	depleteStr := ""
+	if proj != nil && proj.SessionRate > 0 && !math.IsInf(proj.SessionHoursLeft, 0) {
+		depleteText := fmt.Sprintf("(Depletes: %s)", formatDuration(proj.SessionHoursLeft))
+		if len(depleteText) > depleteWidth {
+			depleteText = depleteText[:depleteWidth-1] + ")"
+		}
+		depleteStyle := styles.HelpStyle
+		switch proj.Status {
+		case models.ProjectionCritical:
+			depleteStyle = styles.ErrorTextStyle
+		case models.ProjectionWarning:
+			depleteStyle = styles.WarningTextStyle
+		}
+		depleteStr = depleteStyle.Width(depleteWidth).Align(lipgloss.Right).Render(depleteText)
+	} else {
+		depleteStr = lipgloss.NewStyle().Width(depleteWidth).Render("")
+	}
+
+	bar2 := components.RenderTimeBarChars(timePercent, barWidth)
+
+	return lipgloss.JoinHorizontal(lipgloss.Left,
+		indentSpace,
+		bar2,
+		" ",
+		resetTimeStr,
+		" ",
+		depleteStr,
+	)
+}
+
+func (m *Model) calculatePeriod(tier string, resetSec int64) int64 {
+	const hourInSeconds int64 = 3600
+	const dayInSeconds int64 = 86400
+	const proPeriodSeconds int64 = 5 * 3600
+
+	switch {
+	case tier == "PRO":
+		return proPeriodSeconds
+	case resetSec <= hourInSeconds:
+		return hourInSeconds
+	default:
+		return dayInSeconds
+	}
 }
 
 func formatDuration(hours float64) string {
@@ -441,7 +510,7 @@ func (m *Model) renderTotalBar(percent float64, width int) string {
 		barWidth = 10
 	}
 
-	indent := "    "
+	indent := indentSpace
 
 	percentStr := styles.GetQuotaStyle(percent, false).
 		Width(percentWidth).

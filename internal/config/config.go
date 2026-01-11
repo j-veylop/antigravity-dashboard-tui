@@ -52,7 +52,8 @@ func Load() (*Config, error) {
 	}
 
 	if cfg.GoogleClientID == "" || cfg.GoogleClientSecret == "" {
-		return nil, fmt.Errorf("GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are required (set via env or opencode-antigravity-auth)")
+		return nil, fmt.Errorf(
+			"GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are required (set via env or opencode-antigravity-auth)")
 	}
 
 	// Ensure database directory exists

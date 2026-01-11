@@ -42,7 +42,7 @@ func defaultKeyMap() keyMap {
 
 // Model represents the info tab state.
 type Model struct {
-	state    *app.AppState
+	state    *app.State
 	config   *config.Config
 	width    int
 	height   int
@@ -51,7 +51,7 @@ type Model struct {
 }
 
 // New creates a new info model.
-func New(state *app.AppState, cfg *config.Config) *Model {
+func New(state *app.State, cfg *config.Config) *Model {
 	return &Model{
 		state:    state,
 		config:   cfg,

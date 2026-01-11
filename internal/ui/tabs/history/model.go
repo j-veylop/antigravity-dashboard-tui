@@ -2,6 +2,7 @@
 package history
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -55,7 +56,7 @@ type historyErrorMsg struct {
 
 // Model represents the history tab state.
 type Model struct {
-	state    *app.AppState
+	state    *app.State
 	services *services.Manager
 	width    int
 	height   int
@@ -71,7 +72,7 @@ type Model struct {
 }
 
 // New creates a new history model.
-func New(state *app.AppState, svc *services.Manager) *Model {
+func New(state *app.State, svc *services.Manager) *Model {
 	return &Model{
 		state:     state,
 		services:  svc,
@@ -104,17 +105,17 @@ func (m *Model) loadHistoryCmd() tea.Cmd {
 		var email string
 
 		if selectedIdx >= 0 && selectedIdx < len(accounts) {
-			email = accounts[selectedIdx].Account.Email
+			email = accounts[selectedIdx].Email
 		} else {
 			// Fallback to active account
 			for _, acc := range accounts {
 				if acc.IsActive {
-					email = acc.Account.Email
+					email = acc.Email
 					break
 				}
 			}
 			if email == "" && len(accounts) > 0 {
-				email = accounts[0].Account.Email
+				email = accounts[0].Email
 			}
 		}
 
@@ -144,37 +145,18 @@ func (m *Model) Update(msg tea.Msg) (app.Tab, tea.Cmd) {
 	case historyErrorMsg:
 		m.loading = false
 		m.errorMsg = msg.err
+		cmds = append(cmds, func() tea.Msg {
+			return app.AddNotificationMsg{
+				Type:    app.NotificationError,
+				Message: fmt.Sprintf("History error: %s", msg.err),
+			}
+		})
 
 	case app.AccountsLoadedMsg:
-		// Account data changed - might need to reload
-		if !m.loading && m.historyData != nil {
-			// Check if selected account changed
-			accounts := m.state.GetAccounts()
-			selectedIdx := m.state.GetSelectedAccountIndex()
-			if selectedIdx >= 0 && selectedIdx < len(accounts) {
-				if accounts[selectedIdx].Account.Email != m.historyData.Email {
-					m.loading = true
-					cmds = append(cmds, m.loadHistoryCmd())
-				}
-			}
-		}
+		return m.handleAccountsLoaded()
 
 	case tea.KeyMsg:
-		switch {
-		case key.Matches(msg, m.keys.ToggleRange):
-			m.timeRange = m.timeRange.Next()
-			m.loading = true
-			cmds = append(cmds, m.loadHistoryCmd())
-
-		case key.Matches(msg, m.keys.Refresh):
-			m.loading = true
-			cmds = append(cmds, m.loadHistoryCmd())
-
-		default:
-			var cmd tea.Cmd
-			m.viewport, cmd = m.viewport.Update(msg)
-			cmds = append(cmds, cmd)
-		}
+		return m.handleKeyMsg(msg)
 
 	case app.SelectedAccountChangedMsg:
 		// Selected account changed from Dashboard - reload history
@@ -184,6 +166,50 @@ func (m *Model) Update(msg tea.Msg) (app.Tab, tea.Cmd) {
 		}
 	}
 
+	return m, tea.Batch(cmds...)
+}
+
+func (m *Model) handleAccountsLoaded() (app.Tab, tea.Cmd) {
+	var cmds []tea.Cmd
+	// Account data changed - might need to reload
+	// If we have no history data yet (e.g. initial load failed), try again
+	if m.historyData == nil {
+		m.loading = true
+		cmds = append(cmds, m.loadHistoryCmd())
+		return m, tea.Batch(cmds...)
+	}
+
+	if !m.loading {
+		// Check if selected account changed
+		accounts := m.state.GetAccounts()
+		selectedIdx := m.state.GetSelectedAccountIndex()
+		if selectedIdx >= 0 && selectedIdx < len(accounts) {
+			if accounts[selectedIdx].Email != m.historyData.Email {
+				m.loading = true
+				cmds = append(cmds, m.loadHistoryCmd())
+			}
+		}
+	}
+	return m, tea.Batch(cmds...)
+}
+
+func (m *Model) handleKeyMsg(msg tea.KeyMsg) (app.Tab, tea.Cmd) {
+	var cmds []tea.Cmd
+	switch {
+	case key.Matches(msg, m.keys.ToggleRange):
+		m.timeRange = m.timeRange.Next()
+		m.loading = true
+		cmds = append(cmds, m.loadHistoryCmd())
+
+	case key.Matches(msg, m.keys.Refresh):
+		m.loading = true
+		cmds = append(cmds, m.loadHistoryCmd())
+
+	default:
+		var cmd tea.Cmd
+		m.viewport, cmd = m.viewport.Update(msg)
+		cmds = append(cmds, cmd)
+	}
 	return m, tea.Batch(cmds...)
 }
 

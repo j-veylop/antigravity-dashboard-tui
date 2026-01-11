@@ -28,10 +28,15 @@ type Event struct {
 type EventType int
 
 const (
+	// EventQuotaUpdated indicates that quota information has been updated.
 	EventQuotaUpdated EventType = iota
+	// EventQuotaRefreshing indicates that quota refresh is in progress.
 	EventQuotaRefreshing
+	// EventQuotaError indicates that an error occurred during quota refresh.
 	EventQuotaError
+	// EventTokenRefreshed indicates that an access token has been refreshed.
 	EventTokenRefreshed
+	// EventTokenError indicates that an error occurred during token refresh.
 	EventTokenError
 )
 
@@ -117,7 +122,23 @@ func (s *Service) GetAccessToken(email string) (string, error) {
 		return "", fmt.Errorf("no refresh token for account: %s", email)
 	}
 
-	tokenResp, err := RefreshAccessToken(refreshToken, s.config.ClientID, s.config.ClientSecret)
+	var tokenResp *TokenResponse
+	var err error
+
+	// Retry with exponential backoff
+	backoff := 500 * time.Millisecond
+	for i := 0; i < 3; i++ {
+		tokenResp, err = RefreshAccessToken(refreshToken, s.config.ClientID, s.config.ClientSecret)
+		if err == nil {
+			break
+		}
+
+		if i < 2 {
+			time.Sleep(backoff)
+			backoff *= 2
+		}
+	}
+
 	if err != nil {
 		s.sendEvent(Event{
 			Type:         EventTokenError,
@@ -159,50 +180,51 @@ func (s *Service) RefreshQuota(email string) (*models.QuotaInfo, error) {
 
 	accessToken, err := s.GetAccessToken(email)
 	if err != nil {
-		quotaInfo := &models.QuotaInfo{
-			AccountEmail: email,
-			LastUpdated:  time.Now(),
-			Error:        err.Error(),
-		}
-		s.mu.Lock()
-		s.quotaCache[email] = quotaInfo
-		s.mu.Unlock()
-		s.sendEvent(Event{
-			Type:         EventQuotaError,
-			AccountEmail: email,
-			QuotaInfo:    quotaInfo,
-			Error:        err,
-		})
-		return quotaInfo, err
+		return s.handleQuotaError(email, err)
 	}
 
-	if userInfo, err := FetchUserInfo(accessToken); err == nil && userInfo.Email != "" {
-		if userInfo.Email != email {
-			if err := s.accountProvider.UpdateAccountEmail(email, userInfo.Email); err == nil {
-				email = userInfo.Email
-			}
-		}
+	if newEmail := s.checkEmailUpdate(email, accessToken); newEmail != "" {
+		email = newEmail
 	}
 
 	quotaResp, err := FetchQuota(accessToken)
 	if err != nil {
-		quotaInfo := &models.QuotaInfo{
-			AccountEmail: email,
-			LastUpdated:  time.Now(),
-			Error:        err.Error(),
-		}
-		s.mu.Lock()
-		s.quotaCache[email] = quotaInfo
-		s.mu.Unlock()
-		s.sendEvent(Event{
-			Type:         EventQuotaError,
-			AccountEmail: email,
-			QuotaInfo:    quotaInfo,
-			Error:        err,
-		})
-		return quotaInfo, err
+		return s.handleQuotaError(email, err)
 	}
 
+	return s.processQuotaResponse(email, quotaResp)
+}
+
+func (s *Service) handleQuotaError(email string, err error) (*models.QuotaInfo, error) {
+	quotaInfo := &models.QuotaInfo{
+		AccountEmail: email,
+		LastUpdated:  time.Now(),
+		Error:        err.Error(),
+	}
+	s.mu.Lock()
+	s.quotaCache[email] = quotaInfo
+	s.mu.Unlock()
+	s.sendEvent(Event{
+		Type:         EventQuotaError,
+		AccountEmail: email,
+		QuotaInfo:    quotaInfo,
+		Error:        err,
+	})
+	return quotaInfo, err
+}
+
+func (s *Service) checkEmailUpdate(email, accessToken string) string {
+	if userInfo, err := FetchUserInfo(accessToken); err == nil && userInfo.Email != "" {
+		if userInfo.Email != email {
+			if err := s.accountProvider.UpdateAccountEmail(email, userInfo.Email); err == nil {
+				return userInfo.Email
+			}
+		}
+	}
+	return ""
+}
+
+func (s *Service) processQuotaResponse(email string, quotaResp *Response) (*models.QuotaInfo, error) {
 	quotaInfo := &models.QuotaInfo{
 		AccountEmail:     email,
 		ModelQuotas:      quotaResp.ModelQuotas,
@@ -216,7 +238,8 @@ func (s *Service) RefreshQuota(email string) (*models.QuotaInfo, error) {
 		quotaInfo.TotalLimit += mq.Limit
 	}
 	if quotaInfo.TotalLimit > 0 {
-		quotaInfo.OverallPercent = float64(quotaInfo.TotalLimit-quotaInfo.TotalRemaining) / float64(quotaInfo.TotalLimit) * 100
+		quotaInfo.OverallPercent = float64(quotaInfo.TotalLimit-quotaInfo.TotalRemaining) /
+			float64(quotaInfo.TotalLimit) * 100
 	}
 
 	s.mu.Lock()

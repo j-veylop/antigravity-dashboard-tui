@@ -8,6 +8,7 @@ import (
 	"strings"
 )
 
+// AntigravityConstants holds the hardcoded API credentials.
 type AntigravityConstants struct {
 	ClientID     string
 	ClientSecret string
@@ -22,6 +23,7 @@ func getConstantsFilePath() string {
 		"opencode-antigravity-auth", "dist", "src", "constants.d.ts")
 }
 
+// LoadAntigravityConstants loads the embedded constants.
 func LoadAntigravityConstants() *AntigravityConstants {
 	path := getConstantsFilePath()
 	if path == "" {

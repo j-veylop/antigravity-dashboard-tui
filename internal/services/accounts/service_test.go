@@ -537,7 +537,7 @@ func TestFileFormat(t *testing.T) {
 		t.Fatalf("ReadFile() failed: %v", err)
 	}
 
-	var accountsFile AccountsFile
+	var accountsFile File
 	if err := json.Unmarshal(data, &accountsFile); err != nil {
 		t.Fatalf("Unmarshal() failed: %v", err)
 	}

@@ -71,7 +71,8 @@ type LoadingState struct {
 	Stats    bool
 }
 
-type AppState struct {
+// State holds the global application state.
+type State struct {
 	mu sync.RWMutex
 
 	Accounts             []models.AccountWithQuota
@@ -88,8 +89,9 @@ type AppState struct {
 	notificationSeq int
 }
 
-func NewAppState() *AppState {
-	return &AppState{
+// NewState creates a new application state.
+func NewState() *State {
+	return &State{
 		Accounts:             make([]models.AccountWithQuota, 0),
 		Projections:          make(map[string]*models.AccountProjection),
 		SelectedAccountIndex: 0,
@@ -101,7 +103,7 @@ func NewAppState() *AppState {
 }
 
 // SetLoading sets the loading state for a specific resource.
-func (s *AppState) SetLoading(resource string, loading bool) {
+func (s *State) SetLoading(resource string, loading bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -118,7 +120,7 @@ func (s *AppState) SetLoading(resource string, loading bool) {
 }
 
 // AnyLoading returns true if any resource is currently loading.
-func (s *AppState) AnyLoading() bool {
+func (s *State) AnyLoading() bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -129,14 +131,14 @@ func (s *AppState) AnyLoading() bool {
 }
 
 // IsInitialLoading returns true if initial data is still loading.
-func (s *AppState) IsInitialLoading() bool {
+func (s *State) IsInitialLoading() bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.Loading.Initial
 }
 
 // GetLoadingResources returns a list of currently loading resources.
-func (s *AppState) GetLoadingResources() []string {
+func (s *State) GetLoadingResources() []string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -157,7 +159,7 @@ func (s *AppState) GetLoadingResources() []string {
 }
 
 // SetAccounts updates the accounts list and finds the active account.
-func (s *AppState) SetAccounts(accounts []models.AccountWithQuota) {
+func (s *State) SetAccounts(accounts []models.AccountWithQuota) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -175,7 +177,7 @@ func (s *AppState) SetAccounts(accounts []models.AccountWithQuota) {
 }
 
 // GetAccounts returns a copy of the accounts list.
-func (s *AppState) GetAccounts() []models.AccountWithQuota {
+func (s *State) GetAccounts() []models.AccountWithQuota {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -185,35 +187,35 @@ func (s *AppState) GetAccounts() []models.AccountWithQuota {
 }
 
 // GetAccountCount returns the number of accounts.
-func (s *AppState) GetAccountCount() int {
+func (s *State) GetAccountCount() int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return len(s.Accounts)
 }
 
 // GetActiveAccount returns the active account.
-func (s *AppState) GetActiveAccount() *models.AccountWithQuota {
+func (s *State) GetActiveAccount() *models.AccountWithQuota {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.ActiveAccount
 }
 
 // SetStats updates the statistics.
-func (s *AppState) SetStats(stats services.StatsEvent) {
+func (s *State) SetStats(stats services.StatsEvent) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.Stats = &stats
 }
 
 // GetStats returns the current statistics.
-func (s *AppState) GetStats() *services.StatsEvent {
+func (s *State) GetStats() *services.StatsEvent {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.Stats
 }
 
 // AddNotification adds a new notification and returns its ID.
-func (s *AppState) AddNotification(notifType NotificationType, message string, duration time.Duration) string {
+func (s *State) AddNotification(notifType NotificationType, message string, duration time.Duration) string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -239,7 +241,7 @@ func (s *AppState) AddNotification(notifType NotificationType, message string, d
 }
 
 // RemoveNotification removes a notification by ID.
-func (s *AppState) RemoveNotification(id string) {
+func (s *State) RemoveNotification(id string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -252,7 +254,7 @@ func (s *AppState) RemoveNotification(id string) {
 }
 
 // ClearExpiredNotifications removes all expired notifications.
-func (s *AppState) ClearExpiredNotifications() {
+func (s *State) ClearExpiredNotifications() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -266,7 +268,7 @@ func (s *AppState) ClearExpiredNotifications() {
 }
 
 // GetNotifications returns a copy of all active notifications.
-func (s *AppState) GetNotifications() []Notification {
+func (s *State) GetNotifications() []Notification {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -282,14 +284,14 @@ func (s *AppState) GetNotifications() []Notification {
 }
 
 // ClearAllNotifications removes all notifications.
-func (s *AppState) ClearAllNotifications() {
+func (s *State) ClearAllNotifications() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.notifications = make([]Notification, 0)
 }
 
 // SetLoadingNotification sets a loading notification message.
-func (s *AppState) SetLoadingNotification(message string) {
+func (s *State) SetLoadingNotification(message string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -310,7 +312,7 @@ func (s *AppState) SetLoadingNotification(message string) {
 }
 
 // ClearLoadingNotification removes the loading notification.
-func (s *AppState) ClearLoadingNotification() {
+func (s *State) ClearLoadingNotification() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -323,14 +325,14 @@ func (s *AppState) ClearLoadingNotification() {
 }
 
 // GetLastUpdated returns the last time the state was updated.
-func (s *AppState) GetLastUpdated() time.Time {
+func (s *State) GetLastUpdated() time.Time {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.LastUpdated
 }
 
 // TimeSinceUpdate returns the duration since the last update.
-func (s *AppState) TimeSinceUpdate() time.Duration {
+func (s *State) TimeSinceUpdate() time.Duration {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	if s.LastUpdated.IsZero() {
@@ -339,12 +341,13 @@ func (s *AppState) TimeSinceUpdate() time.Duration {
 	return time.Since(s.LastUpdated)
 }
 
-func (s *AppState) UpdateQuotaForAccount(email string, quotaInfo any) {
+// UpdateQuotaForAccount updates the quota information for a specific account.
+func (s *State) UpdateQuotaForAccount(email string, quotaInfo any) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	for i := range s.Accounts {
-		if s.Accounts[i].Account.Email == email {
+		if s.Accounts[i].Email == email {
 			if qi, ok := quotaInfo.(interface{ GetAccountEmail() string }); ok {
 				_ = qi
 			}
@@ -354,7 +357,8 @@ func (s *AppState) UpdateQuotaForAccount(email string, quotaInfo any) {
 	}
 }
 
-func (s *AppState) SetProjection(email string, proj *models.AccountProjection) {
+// SetProjection sets the projection for a specific account.
+func (s *State) SetProjection(email string, proj *models.AccountProjection) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.Projections == nil {
@@ -363,7 +367,8 @@ func (s *AppState) SetProjection(email string, proj *models.AccountProjection) {
 	s.Projections[email] = proj
 }
 
-func (s *AppState) GetProjection(email string) *models.AccountProjection {
+// GetProjection returns the projection for a specific account.
+func (s *State) GetProjection(email string) *models.AccountProjection {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	if s.Projections == nil {
@@ -372,7 +377,8 @@ func (s *AppState) GetProjection(email string) *models.AccountProjection {
 	return s.Projections[email]
 }
 
-func (s *AppState) GetProjections() map[string]*models.AccountProjection {
+// GetProjections returns all projections.
+func (s *State) GetProjections() map[string]*models.AccountProjection {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	if s.Projections == nil {
@@ -386,14 +392,14 @@ func (s *AppState) GetProjections() map[string]*models.AccountProjection {
 }
 
 // GetSelectedAccountIndex returns the currently selected account index.
-func (s *AppState) GetSelectedAccountIndex() int {
+func (s *State) GetSelectedAccountIndex() int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.SelectedAccountIndex
 }
 
 // SetSelectedAccountIndex updates the selected account index.
-func (s *AppState) SetSelectedAccountIndex(idx int) {
+func (s *State) SetSelectedAccountIndex(idx int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.SelectedAccountIndex = idx

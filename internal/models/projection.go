@@ -27,10 +27,14 @@ type AggregatedSnapshot struct {
 type ProjectionStatus string
 
 const (
-	ProjectionSafe     ProjectionStatus = "SAFE"
-	ProjectionWarning  ProjectionStatus = "WARNING"
+	// ProjectionSafe indicates quota is sufficient for the session.
+	ProjectionSafe ProjectionStatus = "SAFE"
+	// ProjectionWarning indicates quota might run out before reset.
+	ProjectionWarning ProjectionStatus = "WARNING"
+	// ProjectionCritical indicates quota will likely run out very soon.
 	ProjectionCritical ProjectionStatus = "CRITICAL"
-	ProjectionUnknown  ProjectionStatus = "UNKNOWN"
+	// ProjectionUnknown indicates insufficient data for projection.
+	ProjectionUnknown ProjectionStatus = "UNKNOWN"
 )
 
 // HistoricalContext provides long-term usage context for projections.

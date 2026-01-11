@@ -28,6 +28,7 @@ func parseTimeString(s string) (time.Time, bool) {
 	return time.Time{}, false
 }
 
+// GetMonthlyStats returns aggregated stats per month.
 func (db *DB) GetMonthlyStats(email string, months int) ([]models.PeriodStats, error) {
 	query := `
 		SELECT
@@ -84,6 +85,7 @@ func (db *DB) GetMonthlyStats(email string, months int) ([]models.PeriodStats, e
 	return stats, rows.Err()
 }
 
+// GetUsagePatterns returns average consumption by hour and day of week.
 func (db *DB) GetUsagePatterns(email string) ([]models.UsagePattern, error) {
 	query := `
 		SELECT
@@ -123,9 +125,26 @@ func (db *DB) GetUsagePatterns(email string) ([]models.UsagePattern, error) {
 	return patterns, rows.Err()
 }
 
+// GetHistoricalContext returns overall historical usage context.
 func (db *DB) GetHistoricalContext(email string) (*models.HistoricalContext, error) {
 	ctx := &models.HistoricalContext{}
 
+	if err := db.getMonthlyRates(email, ctx); err != nil {
+		return nil, err
+	}
+
+	if err := db.getAllTimeStats(email, ctx); err != nil {
+		return nil, err
+	}
+
+	if err := db.getPeakUsage(email, ctx); err != nil {
+		return nil, err
+	}
+
+	return ctx, nil
+}
+
+func (db *DB) getMonthlyRates(email string, ctx *models.HistoricalContext) error {
 	currentMonthQuery := `
 		SELECT COALESCE(AVG(claude_consumed + gemini_consumed) * 12, 0)
 		FROM quota_snapshots_agg
@@ -133,7 +152,7 @@ func (db *DB) GetHistoricalContext(email string) (*models.HistoricalContext, err
 	`
 	err := db.QueryRowContext(context.Background(), currentMonthQuery, email).Scan(&ctx.CurrentMonthRate)
 	if err != nil && err != sql.ErrNoRows {
-		return nil, fmt.Errorf("failed to scan current month rate: %w", err)
+		return fmt.Errorf("failed to scan current month rate: %w", err)
 	}
 
 	lastMonthQuery := `
@@ -143,13 +162,16 @@ func (db *DB) GetHistoricalContext(email string) (*models.HistoricalContext, err
 	`
 	err = db.QueryRowContext(context.Background(), lastMonthQuery, email).Scan(&ctx.LastMonthRate)
 	if err != nil && err != sql.ErrNoRows {
-		return nil, fmt.Errorf("failed to scan last month rate: %w", err)
+		return fmt.Errorf("failed to scan last month rate: %w", err)
 	}
 
 	if ctx.LastMonthRate > 0 {
 		ctx.MonthOverMonthDiff = ((ctx.CurrentMonthRate - ctx.LastMonthRate) / ctx.LastMonthRate) * 100
 	}
+	return nil
+}
 
+func (db *DB) getAllTimeStats(email string, ctx *models.HistoricalContext) error {
 	allTimeQuery := `
 		SELECT
 			COALESCE(AVG(claude_consumed + gemini_consumed) * 12, 0) as avg_rate,
@@ -166,7 +188,7 @@ func (db *DB) GetHistoricalContext(email string) (*models.HistoricalContext, err
 		&ctx.AllTimeAvgRate, &ctx.AllTimePeakRate, &ctx.TotalSessionsEver,
 		&firstDataStr, &totalDays,
 	); err != nil && err != sql.ErrNoRows {
-		return nil, fmt.Errorf("failed to scan all-time stats: %w", err)
+		return fmt.Errorf("failed to scan all-time stats: %w", err)
 	}
 	if firstDataStr.Valid && firstDataStr.String != "" {
 		if t, ok := parseTimeString(firstDataStr.String); ok {
@@ -176,7 +198,17 @@ func (db *DB) GetHistoricalContext(email string) (*models.HistoricalContext, err
 	if totalDays.Valid {
 		ctx.TotalDataDays = int(totalDays.Int64)
 	}
+	return nil
+}
 
+func (db *DB) getPeakUsage(email string, ctx *models.HistoricalContext) error {
+	if err := db.getPeakUsageDay(email, ctx); err != nil {
+		return err
+	}
+	return db.getPeakUsageHour(email, ctx)
+}
+
+func (db *DB) getPeakUsageDay(email string, ctx *models.HistoricalContext) error {
 	peakDayQuery := `
 		SELECT day_of_week
 		FROM quota_snapshots_agg
@@ -186,13 +218,20 @@ func (db *DB) GetHistoricalContext(email string) (*models.HistoricalContext, err
 		LIMIT 1
 	`
 	var peakDayNum sql.NullInt64
-	if db.QueryRowContext(context.Background(), peakDayQuery, email).Scan(&peakDayNum) == nil && peakDayNum.Valid {
+	if err := db.QueryRowContext(context.Background(), peakDayQuery, email).Scan(&peakDayNum); err != nil &&
+		err != sql.ErrNoRows {
+		return fmt.Errorf("failed to scan peak day: %w", err)
+	}
+	if peakDayNum.Valid {
 		days := []string{"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"}
 		if peakDayNum.Int64 >= 0 && peakDayNum.Int64 < 7 {
 			ctx.PeakUsageDay = days[peakDayNum.Int64]
 		}
 	}
+	return nil
+}
 
+func (db *DB) getPeakUsageHour(email string, ctx *models.HistoricalContext) error {
 	peakHourQuery := `
 		SELECT hour
 		FROM quota_snapshots_agg
@@ -202,13 +241,17 @@ func (db *DB) GetHistoricalContext(email string) (*models.HistoricalContext, err
 		LIMIT 1
 	`
 	var peakHour sql.NullInt64
-	if db.QueryRowContext(context.Background(), peakHourQuery, email).Scan(&peakHour) == nil && peakHour.Valid {
+	if err := db.QueryRowContext(context.Background(), peakHourQuery, email).Scan(&peakHour); err != nil &&
+		err != sql.ErrNoRows {
+		return fmt.Errorf("failed to scan peak hour: %w", err)
+	}
+	if peakHour.Valid {
 		ctx.PeakUsageHour = int(peakHour.Int64)
 	}
-
-	return ctx, nil
+	return nil
 }
 
+// GetFirstSnapshotTime returns the timestamp of the first recorded snapshot.
 func (db *DB) GetFirstSnapshotTime(email string) (time.Time, error) {
 	query := `SELECT MIN(bucket_time) FROM quota_snapshots_agg WHERE email = ?`
 	var tStr sql.NullString
@@ -229,16 +272,28 @@ func (db *DB) GetFirstSnapshotTime(email string) (time.Time, error) {
 func (db *DB) GetRateLimitTransitions(email string, days int) (*models.RateLimitStats, error) {
 	stats := &models.RateLimitStats{}
 
-	// Build time filter
+	if err := db.getTransitionsInRange(email, days, stats); err != nil {
+		return nil, err
+	}
+
+	db.getAllTimeTransitions(email, stats)
+	db.getRecentTransitions(email, stats)
+
+	if err := db.getTransitionsByDay(email, days, stats); err != nil {
+		return nil, err
+	}
+
+	return stats, nil
+}
+
+func (db *DB) getTransitionsInRange(email string, days int, stats *models.RateLimitStats) error {
 	timeFilter := ""
-	args := []interface{}{email}
+	args := []any{email}
 	if days > 0 {
 		timeFilter = "AND bucket_time >= datetime('now', ?)"
 		args = append(args, fmt.Sprintf("-%d days", days))
 	}
 
-	// Count transitions using window function to detect when consumption crosses threshold
-	// We detect when claude_consumed or gemini_consumed goes from <99 to >=99
 	transitionQuery := fmt.Sprintf(`
 		WITH ordered_snapshots AS (
 			SELECT 
@@ -264,15 +319,17 @@ func (db *DB) GetRateLimitTransitions(email string, days int) (*models.RateLimit
 		&stats.HitsInRange, &lastHitStr,
 	)
 	if err != nil && err != sql.ErrNoRows {
-		return nil, fmt.Errorf("failed to query rate limit transitions: %w", err)
+		return fmt.Errorf("failed to query rate limit transitions: %w", err)
 	}
 	if lastHitStr.Valid && lastHitStr.String != "" {
 		if t, ok := parseTimeString(lastHitStr.String); ok {
 			stats.LastHitTime = t
 		}
 	}
+	return nil
+}
 
-	// Get all-time total (without time filter)
+func (db *DB) getAllTimeTransitions(email string, stats *models.RateLimitStats) {
 	allTimeQuery := `
 		WITH ordered_snapshots AS (
 			SELECT 
@@ -289,13 +346,13 @@ func (db *DB) GetRateLimitTransitions(email string, days int) (*models.RateLimit
 		WHERE (claude_consumed >= 99 AND COALESCE(prev_claude, 0) < 99)
 		   OR (gemini_consumed >= 99 AND COALESCE(prev_gemini, 0) < 99)
 	`
-	err = db.QueryRowContext(context.Background(), allTimeQuery, email).Scan(&stats.TotalHits)
+	err := db.QueryRowContext(context.Background(), allTimeQuery, email).Scan(&stats.TotalHits)
 	if err != nil && err != sql.ErrNoRows {
-		// Non-critical, continue with zero value
 		stats.TotalHits = 0
 	}
+}
 
-	// Get last 7 days hits
+func (db *DB) getRecentTransitions(email string, stats *models.RateLimitStats) {
 	last7Query := `
 		WITH ordered_snapshots AS (
 			SELECT 
@@ -312,13 +369,10 @@ func (db *DB) GetRateLimitTransitions(email string, days int) (*models.RateLimit
 		WHERE (claude_consumed >= 99 AND COALESCE(prev_claude, 0) < 99)
 		   OR (gemini_consumed >= 99 AND COALESCE(prev_gemini, 0) < 99)
 	`
-	err = db.QueryRowContext(context.Background(), last7Query, email).Scan(&stats.HitsLast7Days)
-	if err != nil && err != sql.ErrNoRows {
-		// Non-critical, continue with zero value
+	if err := db.QueryRowContext(context.Background(), last7Query, email).Scan(&stats.HitsLast7Days); err != nil {
 		stats.HitsLast7Days = 0
 	}
 
-	// Get last 30 days hits
 	last30Query := `
 		WITH ordered_snapshots AS (
 			SELECT 
@@ -335,13 +389,19 @@ func (db *DB) GetRateLimitTransitions(email string, days int) (*models.RateLimit
 		WHERE (claude_consumed >= 99 AND COALESCE(prev_claude, 0) < 99)
 		   OR (gemini_consumed >= 99 AND COALESCE(prev_gemini, 0) < 99)
 	`
-	err = db.QueryRowContext(context.Background(), last30Query, email).Scan(&stats.HitsLast30Days)
-	if err != nil && err != sql.ErrNoRows {
-		// Non-critical, continue with zero value
+	if err := db.QueryRowContext(context.Background(), last30Query, email).Scan(&stats.HitsLast30Days); err != nil {
 		stats.HitsLast30Days = 0
 	}
+}
 
-	// Get hits by day for the selected range
+func (db *DB) getTransitionsByDay(email string, days int, stats *models.RateLimitStats) error {
+	timeFilter := ""
+	args := []any{email}
+	if days > 0 {
+		timeFilter = "AND bucket_time >= datetime('now', ?)"
+		args = append(args, fmt.Sprintf("-%d days", days))
+	}
+
 	hitsByDayQuery := fmt.Sprintf(`
 		WITH ordered_snapshots AS (
 			SELECT 
@@ -363,7 +423,7 @@ func (db *DB) GetRateLimitTransitions(email string, days int) (*models.RateLimit
 
 	rows, err := db.QueryContext(context.Background(), hitsByDayQuery, args...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query hits by day: %w", err)
+		return fmt.Errorf("failed to query hits by day: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -380,23 +440,34 @@ func (db *DB) GetRateLimitTransitions(email string, days int) (*models.RateLimit
 			})
 		}
 	}
-
-	return stats, nil
+	return nil
 }
 
 // GetSessionExhaustionStats calculates time-to-exhaustion statistics per session.
 func (db *DB) GetSessionExhaustionStats(email string, days int) (*models.ExhaustionStats, error) {
 	stats := &models.ExhaustionStats{}
 
-	// Build time filter
+	rows, err := db.querySessionStats(email, days)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	exhaustedDurations, startPercents := db.processSessionRows(rows, stats)
+
+	db.calculateExhaustionStats(stats, exhaustedDurations, startPercents)
+
+	return stats, nil
+}
+
+func (db *DB) querySessionStats(email string, days int) (*sql.Rows, error) {
 	timeFilter := ""
-	args := []interface{}{email}
+	args := []any{email}
 	if days > 0 {
 		timeFilter = sqlTimeFilterClause
 		args = append(args, fmt.Sprintf("-%d days", days))
 	}
 
-	// Get session-level stats: start time, end time, consumption at start/end
 	sessionQuery := fmt.Sprintf(`
 		SELECT 
 			session_id,
@@ -424,9 +495,10 @@ func (db *DB) GetSessionExhaustionStats(email string, days int) (*models.Exhaust
 	if err != nil {
 		return nil, fmt.Errorf("failed to query session stats: %w", err)
 	}
-	defer func() { _ = rows.Close() }()
+	return rows, nil
+}
 
-	var totalDuration time.Duration
+func (db *DB) processSessionRows(rows *sql.Rows, stats *models.ExhaustionStats) ([]time.Duration, []float64) {
 	var exhaustedDurations []time.Duration
 	var startPercents []float64
 
@@ -452,9 +524,6 @@ func (db *DB) GetSessionExhaustionStats(email string, days int) (*models.Exhaust
 		}
 
 		duration := endTime.Sub(startTime)
-		if duration > 0 {
-			totalDuration += duration
-		}
 
 		// Session is "exhausted" if peak consumption >= 99%
 		if peakConsumed.Valid && peakConsumed.Float64 >= 99 {
@@ -477,8 +546,14 @@ func (db *DB) GetSessionExhaustionStats(email string, days int) (*models.Exhaust
 			startPercents = append(startPercents, 100-startConsumed.Float64)
 		}
 	}
+	return exhaustedDurations, startPercents
+}
 
-	// Calculate averages
+func (db *DB) calculateExhaustionStats(
+	stats *models.ExhaustionStats,
+	exhaustedDurations []time.Duration,
+	startPercents []float64,
+) {
 	if stats.TotalSessions > 0 {
 		if len(exhaustedDurations) > 0 {
 			var totalExhausted time.Duration
@@ -511,15 +586,13 @@ func (db *DB) GetSessionExhaustionStats(email string, days int) (*models.Exhaust
 			stats.AvgStartPercent = totalStart / float64(len(startPercents))
 		}
 	}
-
-	return stats, nil
 }
 
 // GetDailyUsageTrend returns daily consumption data for charts.
 func (db *DB) GetDailyUsageTrend(email string, days int) ([]models.DailyUsagePoint, error) {
 	// Build time filter
 	timeFilter := ""
-	args := []interface{}{email}
+	args := []any{email}
 	if days > 0 {
 		timeFilter = sqlTimeFilterClause
 		args = append(args, fmt.Sprintf("-%d days", days))
@@ -576,7 +649,7 @@ func (db *DB) GetDailyUsageTrend(email string, days int) ([]models.DailyUsagePoi
 func (db *DB) GetHourlyPatterns(email string, days int) ([]models.HourlyPattern, error) {
 	// Build time filter
 	timeFilter := ""
-	args := []interface{}{email}
+	args := []any{email}
 	if days > 0 {
 		timeFilter = sqlTimeFilterClause
 		args = append(args, fmt.Sprintf("-%d days", days))
@@ -601,7 +674,7 @@ func (db *DB) GetHourlyPatterns(email string, days int) ([]models.HourlyPattern,
 
 	// Initialize all 24 hours
 	patterns := make([]models.HourlyPattern, 24)
-	for i := 0; i < 24; i++ {
+	for i := range 24 {
 		patterns[i] = models.HourlyPattern{Hour: i}
 	}
 
@@ -629,7 +702,7 @@ func (db *DB) GetWeekdayPatterns(email string, days int) ([]models.WeekdayPatter
 
 	// Build time filter
 	timeFilter := ""
-	args := []interface{}{email}
+	args := []any{email}
 	if days > 0 {
 		timeFilter = sqlTimeFilterClause
 		args = append(args, fmt.Sprintf("-%d days", days))
@@ -654,7 +727,7 @@ func (db *DB) GetWeekdayPatterns(email string, days int) ([]models.WeekdayPatter
 
 	// Initialize all 7 days
 	patterns := make([]models.WeekdayPattern, 7)
-	for i := 0; i < 7; i++ {
+	for i := range 7 {
 		patterns[i] = models.WeekdayPattern{
 			DayOfWeek: i,
 			DayName:   dayNames[i],

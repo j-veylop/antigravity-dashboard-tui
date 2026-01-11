@@ -10,6 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/j-veylop/antigravity-dashboard-tui/internal/app"
+	"github.com/j-veylop/antigravity-dashboard-tui/internal/models"
 	"github.com/j-veylop/antigravity-dashboard-tui/internal/ui/components"
 )
 
@@ -66,7 +67,7 @@ type AnimationState struct {
 
 // Model represents the dashboard tab state.
 type Model struct {
-	state          *app.AppState
+	state          *app.State
 	width          int
 	height         int
 	spinner        components.LoadingSpinner
@@ -81,7 +82,7 @@ type Model struct {
 }
 
 // New creates a new dashboard model.
-func New(state *app.AppState) *Model {
+func New(state *app.State) *Model {
 	// Initialize spinner but don't configure it here since NewSpinner does it
 	return &Model{
 		state:          state,
@@ -175,76 +176,66 @@ func (m *Model) syncAnimationTargets(now time.Time) (animating, hasPendingData b
 			continue
 		}
 
-		claudeTarget := -1.0
-		geminiTarget := -1.0
+		claudeTarget, geminiTarget := m.calculateTargets(acc.QuotaInfo)
 
-		for _, mq := range acc.QuotaInfo.ModelQuotas {
-			target := 0.0
-			if mq.Limit > 0 && !mq.IsRateLimited {
-				target = float64(mq.Remaining) / float64(mq.Limit) * 100
-			}
-
-			if mq.ModelFamily == "claude" {
-				if claudeTarget < 0 || target < claudeTarget {
-					claudeTarget = target
-				}
-			} else if mq.ModelFamily == "gemini" {
-				if geminiTarget < 0 || target < geminiTarget {
-					geminiTarget = target
-				}
-			}
+		if m.updateAnimationState(acc.Email+":claude", claudeTarget, now) {
+			animating = true
 		}
-
-		if claudeTarget >= 0 {
-			key := acc.Account.Email + ":claude"
-			state, exists := m.animations[key]
-			if !exists {
-				state = &AnimationState{
-					CurrentPercent: 0,
-					StartPercent:   0,
-					TargetPercent:  0,
-					StartTime:      now,
-				}
-				m.animations[key] = state
-			}
-
-			if claudeTarget != state.TargetPercent {
-				state.StartPercent = state.CurrentPercent
-				state.TargetPercent = claudeTarget
-				state.StartTime = now
-			}
-
-			if state.CurrentPercent != state.TargetPercent {
-				animating = true
-			}
-		}
-
-		if geminiTarget >= 0 {
-			key := acc.Account.Email + ":gemini"
-			state, exists := m.animations[key]
-			if !exists {
-				state = &AnimationState{
-					CurrentPercent: 0,
-					StartPercent:   0,
-					TargetPercent:  0,
-					StartTime:      now,
-				}
-				m.animations[key] = state
-			}
-
-			if geminiTarget != state.TargetPercent {
-				state.StartPercent = state.CurrentPercent
-				state.TargetPercent = geminiTarget
-				state.StartTime = now
-			}
-
-			if state.CurrentPercent != state.TargetPercent {
-				animating = true
-			}
+		if m.updateAnimationState(acc.Email+":gemini", geminiTarget, now) {
+			animating = true
 		}
 	}
 
 	return animating, hasPendingData
+}
+
+func (m *Model) calculateTargets(quotaInfo *models.QuotaInfo) (claudeTarget, geminiTarget float64) {
+	claudeTarget = -1.0
+	geminiTarget = -1.0
+
+	for _, mq := range quotaInfo.ModelQuotas {
+		target := 0.0
+		if mq.Limit > 0 && !mq.IsRateLimited {
+			target = float64(mq.Remaining) / float64(mq.Limit) * 100
+		}
+
+		switch mq.ModelFamily {
+		case "claude":
+			if claudeTarget < 0 || target < claudeTarget {
+				claudeTarget = target
+			}
+		case "gemini":
+			if geminiTarget < 0 || target < geminiTarget {
+				geminiTarget = target
+			}
+		}
+	}
+	return claudeTarget, geminiTarget
+}
+
+func (m *Model) updateAnimationState(key string, target float64, now time.Time) bool {
+	if target < 0 {
+		return false
+	}
+
+	state, exists := m.animations[key]
+	if !exists {
+		state = &AnimationState{
+			CurrentPercent: 0,
+			StartPercent:   0,
+			TargetPercent:  0,
+			StartTime:      now,
+		}
+		m.animations[key] = state
+	}
+
+	if target != state.TargetPercent {
+		state.StartPercent = state.CurrentPercent
+		state.TargetPercent = target
+		state.StartTime = now
+	}
+
+	return state.CurrentPercent != state.TargetPercent
 }
 
 func (m *Model) stepAnimations(now time.Time) {

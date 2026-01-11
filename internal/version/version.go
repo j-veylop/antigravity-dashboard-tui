@@ -3,6 +3,7 @@ package version
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os/exec"
 	"runtime"
@@ -12,10 +13,12 @@ import (
 )
 
 var (
-	// These are set via ldflags at build time
+	// Version is the build version, set via ldflags.
 	Version = ""
-	Commit  = ""
-	Date    = ""
+	// Commit is the git commit hash, set via ldflags.
+	Commit = ""
+	// Date is the build date, set via ldflags.
+	Date = ""
 
 	once sync.Once
 )
@@ -35,7 +38,9 @@ func ensureInitialized() {
 }
 
 func getGitCommit() string {
-	cmd := exec.Command("git", "describe", "--always", "--dirty")
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "git", "describe", "--always", "--dirty")
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	if err := cmd.Run(); err != nil {
@@ -45,7 +50,9 @@ func getGitCommit() string {
 }
 
 func getGitVersion() string {
-	cmd := exec.Command("git", "describe", "--tags", "--abbrev=0")
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "git", "describe", "--tags", "--abbrev=0")
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	if err := cmd.Run(); err == nil {
@@ -57,6 +64,7 @@ func getGitVersion() string {
 	return "dev"
 }
 
+// Info returns the full version string.
 func Info() string {
 	ensureInitialized()
 	return fmt.Sprintf("antigravity-dashboard-tui %s (commit: %s, built: %s, %s/%s)",

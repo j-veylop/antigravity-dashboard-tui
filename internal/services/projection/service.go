@@ -6,6 +6,7 @@ package projection
 import (
 	"crypto/sha256"
 	"fmt"
+	"maps"
 	"math"
 	"sync"
 	"time"
@@ -21,6 +22,7 @@ const (
 	medConfThreshold = 24
 )
 
+// Service handles projection calculations.
 type Service struct {
 	mu sync.RWMutex
 	db *db.DB
@@ -36,6 +38,7 @@ type quotaState struct {
 	timestamp     time.Time
 }
 
+// New creates a new projection service.
 func New(database *db.DB) *Service {
 	return &Service{
 		db:              database,
@@ -45,6 +48,7 @@ func New(database *db.DB) *Service {
 	}
 }
 
+// CalculateProjections calculates usage projections for an account.
 func (s *Service) CalculateProjections(
 	email string,
 	claudePercent, geminiPercent float64,
@@ -106,6 +110,28 @@ func (s *Service) calculateModelProjection(
 	dataPoints int,
 	historical *models.HistoricalContext,
 ) *models.ModelProjection {
+	proj := s.initProjection(model, currentPercent, sessionRate, historicalRate, resetTime, dataPoints, historical)
+
+	effectiveRate := s.calculateDepletion(proj, currentPercent, sessionRate, historicalRate)
+	s.determineStatus(proj, currentPercent, effectiveRate, resetTime)
+
+	if historical != nil {
+		proj.VsLastMonth = s.formatComparison(sessionRate, historical.LastMonthRate)
+		proj.VsHistorical = s.formatHistoricalComparison(sessionRate, historical.AllTimeAvgRate)
+	}
+
+	return proj
+}
+
+func (s *Service) initProjection(
+	model string,
+	currentPercent float64,
+	sessionRate float64,
+	historicalRate float64,
+	resetTime time.Time,
+	dataPoints int,
+	historical *models.HistoricalContext,
+) *models.ModelProjection {
 	proj := &models.ModelProjection{
 		Model:          model,
 		CurrentPercent: currentPercent,
@@ -123,14 +149,24 @@ func (s *Service) calculateModelProjection(
 		proj.TimeUntilReset = 0
 	}
 
-	if dataPoints < lowConfThreshold {
+	switch {
+	case dataPoints < lowConfThreshold:
 		proj.Confidence = "low"
-	} else if dataPoints < medConfThreshold {
+	case dataPoints < medConfThreshold:
 		proj.Confidence = "medium"
-	} else {
+	default:
 		proj.Confidence = "high"
 	}
 
+	return proj
+}
+
+func (s *Service) calculateDepletion(
+	proj *models.ModelProjection,
+	currentPercent float64,
+	sessionRate float64,
+	historicalRate float64,
+) float64 {
 	effectiveRate := sessionRate
 	if effectiveRate <= 0 && historicalRate > 0 {
 		effectiveRate = historicalRate
@@ -143,6 +179,15 @@ func (s *Service) calculateModelProjection(
 		proj.SessionHoursLeft = math.Inf(1)
 	}
 
+	return effectiveRate
+}
+
+func (s *Service) determineStatus(
+	proj *models.ModelProjection,
+	currentPercent float64,
+	effectiveRate float64,
+	resetTime time.Time,
+) {
 	if !resetTime.IsZero() && effectiveRate > 0 {
 		hoursUntilReset := proj.TimeUntilReset.Hours()
 		neededToSurvive := effectiveRate * hoursUntilReset
@@ -158,13 +203,6 @@ func (s *Service) calculateModelProjection(
 			proj.Status = models.ProjectionSafe
 		}
 	}
-
-	if historical != nil {
-		proj.VsLastMonth = s.formatComparison(sessionRate, historical.LastMonthRate)
-		proj.VsHistorical = s.formatHistoricalComparison(sessionRate, historical.AllTimeAvgRate)
-	}
-
-	return proj
 }
 
 func (s *Service) formatComparison(current, reference float64) string {
@@ -193,6 +231,7 @@ func (s *Service) formatHistoricalComparison(current, allTimeAvg float64) string
 	return "Below your average"
 }
 
+// AggregateSnapshot aggregates quota data into a snapshot.
 func (s *Service) AggregateSnapshot(
 	email string,
 	claudePercent, geminiPercent float64,
@@ -249,10 +288,12 @@ func (s *Service) AggregateSnapshot(
 	return nil
 }
 
-func (s *Service) DetectSessionBoundary(email string, newPercent, oldPercent float64) bool {
+// DetectSessionBoundary checks if a new session has started.
+func (s *Service) DetectSessionBoundary(_ string, newPercent, oldPercent float64) bool {
 	return newPercent > oldPercent+5
 }
 
+// GenerateSessionID creates a unique session ID based on reset time.
 func (s *Service) GenerateSessionID(email string, resetTime time.Time) string {
 	if resetTime.IsZero() {
 		resetTime = time.Now()
@@ -262,22 +303,23 @@ func (s *Service) GenerateSessionID(email string, resetTime time.Time) string {
 	return fmt.Sprintf("ses_%x", hash[:8])
 }
 
+// GetCachedProjection returns the cached projection for an email.
 func (s *Service) GetCachedProjection(email string) *models.AccountProjection {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.projectionCache[email]
 }
 
+// GetAllProjections returns all cached projections.
 func (s *Service) GetAllProjections() map[string]*models.AccountProjection {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	result := make(map[string]*models.AccountProjection, len(s.projectionCache))
-	for k, v := range s.projectionCache {
-		result[k] = v
-	}
+	maps.Copy(result, s.projectionCache)
 	return result
 }
 
+// GetOrCreateSessionID gets or creates a session ID.
 func (s *Service) GetOrCreateSessionID(email string, resetTime time.Time) string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -291,6 +333,7 @@ func (s *Service) GetOrCreateSessionID(email string, resetTime time.Time) string
 	return sid
 }
 
+// ResetSession creates a new session ID for the account.
 func (s *Service) ResetSession(email string, resetTime time.Time) string {
 	s.mu.Lock()
 	defer s.mu.Unlock()

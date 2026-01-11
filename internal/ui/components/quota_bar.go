@@ -13,6 +13,7 @@ import (
 	"github.com/j-veylop/antigravity-dashboard-tui/internal/ui/styles"
 )
 
+// AnimationTickMsg is a message used for animation ticks.
 type AnimationTickMsg time.Time
 
 func animationTick() tea.Cmd {
@@ -70,12 +71,12 @@ func NewQuotaBarWithWidth(width int) QuotaBar {
 	}
 }
 
-// Init initializes the progress bar model.
+// Init initializes the model.
 func (q QuotaBar) Init() tea.Cmd {
 	return nil
 }
 
-// Update handles progress bar animation messages.
+// Update handles messages.
 func (q QuotaBar) Update(msg tea.Msg) (QuotaBar, tea.Cmd) {
 	var cmds []tea.Cmd
 
@@ -83,7 +84,8 @@ func (q QuotaBar) Update(msg tea.Msg) (QuotaBar, tea.Cmd) {
 		if q.isAnimating {
 			q.animationFrame++
 
-			if q.currentPercent < q.targetPercent {
+			switch {
+			case q.currentPercent < q.targetPercent:
 				step := (q.targetPercent - q.currentPercent) / 10
 				if step < 0.5 {
 					step = 0.5
@@ -93,7 +95,7 @@ func (q QuotaBar) Update(msg tea.Msg) (QuotaBar, tea.Cmd) {
 					q.currentPercent = q.targetPercent
 				}
 				cmds = append(cmds, animationTick())
-			} else if q.currentPercent > q.targetPercent {
+			case q.currentPercent > q.targetPercent:
 				step := (q.currentPercent - q.targetPercent) / 10
 				if step < 0.5 {
 					step = 0.5
@@ -103,7 +105,7 @@ func (q QuotaBar) Update(msg tea.Msg) (QuotaBar, tea.Cmd) {
 					q.currentPercent = q.targetPercent
 				}
 				cmds = append(cmds, animationTick())
-			} else {
+			default:
 				q.isAnimating = false
 			}
 		}
@@ -117,7 +119,7 @@ func (q QuotaBar) Update(msg tea.Msg) (QuotaBar, tea.Cmd) {
 	return q, tea.Batch(cmds...)
 }
 
-// SetPercent sets the current percentage.
+// SetPercent sets the percentage.
 func (q *QuotaBar) SetPercent(percent float64) tea.Cmd {
 	q.percent = percent
 	q.targetPercent = percent
@@ -134,33 +136,29 @@ func (q *QuotaBar) SetPercent(percent float64) tea.Cmd {
 	return q.progress.SetPercent(percent / 100)
 }
 
-// SetLabel sets the bar label.
+// SetLabel sets the label.
 func (q *QuotaBar) SetLabel(label string) {
 	q.label = label
 }
 
-// SetWidth sets the progress bar width.
+// SetWidth sets the width.
 func (q *QuotaBar) SetWidth(width int) {
 	q.progress.Width = width
 }
 
-// View renders the quota bar with percentage and label.
+// View returns the string representation.
 func (q QuotaBar) View(percent float64, label string, width int) string {
-	// Update the progress bar width
-	barWidth := width - 30 // Reserve space for label and percentage
+	barWidth := width - 30
 	if barWidth < 10 {
 		barWidth = 10
 	}
 	q.progress.Width = barWidth
 
-	// Render the progress bar
 	bar := q.progress.ViewAs(percent / 100)
 
-	// Format percentage with color
 	percentStyle := styles.GetQuotaStyle(percent, false)
 	percentStr := percentStyle.Width(6).Align(lipgloss.Right).Render(fmt.Sprintf("%.0f%%", percent))
 
-	// Render label
 	labelStyle := styles.ProgressLabelStyle
 	labelStr := labelStyle.Width(15).Render(label)
 
@@ -173,7 +171,7 @@ func (q QuotaBar) View(percent float64, label string, width int) string {
 	)
 }
 
-// ViewCompact renders a compact version without label.
+// ViewCompact renders a compact version.
 func (q QuotaBar) ViewCompact(percent float64, width int) string {
 	barWidth := width - 8
 	if barWidth < 5 {
@@ -198,7 +196,6 @@ func (q QuotaBar) ViewRateLimited(label string, width int) string {
 		barWidth = 10
 	}
 
-	// Render empty bar with rate limited indicator
 	emptyBar := lipgloss.NewStyle().
 		Foreground(styles.Error).
 		Render(strings.Repeat("░", barWidth))
@@ -225,7 +222,7 @@ type TimeBar struct {
 // NewTimeBar creates a new time bar for visualizing time remaining.
 func NewTimeBar() TimeBar {
 	p := progress.New(
-		progress.WithScaledGradient("#ffd93d", "#6c5ce7"), // Yellow to purple
+		progress.WithScaledGradient("#ffd93d", "#6c5ce7"),
 		progress.WithWidth(30),
 		progress.WithoutPercentage(),
 	)
@@ -266,18 +263,18 @@ func RenderTimeBarChars(percent float64, width int) string {
 }
 
 // ViewWithLabel renders the time bar with label padding to align with quota bars.
-// The bar fills up as time runs out (inverted: more filled = less time remaining).
 func (t TimeBar) ViewWithLabel(secondsRemaining int64, label string, width int, tier string) string {
 	const hourInSeconds int64 = 3600
 	const dayInSeconds int64 = 86400
 	const proPeriodSeconds int64 = 5 * 3600
 
 	var period int64
-	if tier == "PRO" {
+	switch {
+	case tier == "PRO":
 		period = proPeriodSeconds
-	} else if secondsRemaining <= hourInSeconds {
+	case secondsRemaining <= hourInSeconds:
 		period = hourInSeconds
-	} else {
+	default:
 		period = dayInSeconds
 	}
 
@@ -395,6 +392,7 @@ func hexToRGB(hex string) [3]int {
 	return [3]int{r, g, b}
 }
 
+// SimpleQuotaBarLoading renders a loading state for the quota bar.
 func SimpleQuotaBarLoading(label string, width int, frame int) string {
 	const (
 		indentWidth  = 4
@@ -416,43 +414,7 @@ func SimpleQuotaBarLoading(label string, width int, frame int) string {
 		accentColor = styles.Primary
 	}
 
-	cycle := 120
-
-	t := float64(frame%cycle) / float64(cycle)
-	var p float64
-	if t < 0.5 {
-		p = t * 2
-	} else {
-		p = (1 - t) * 2
-	}
-	eased := p * p * (3 - 2*p)
-	shimmerPos := int(eased * float64(barWidth))
-	var barChars []string
-
-	for i := 0; i < barWidth; i++ {
-		dist := shimmerPos - i
-		if dist < 0 {
-			dist = -dist
-		}
-
-		var char string
-		var style lipgloss.Style
-
-		if dist < 3 {
-			char = "▓"
-			style = lipgloss.NewStyle().Foreground(accentColor)
-		} else if dist < 5 {
-			char = "▒"
-			style = lipgloss.NewStyle().Foreground(styles.TextSecondary)
-		} else {
-			char = "░"
-			style = lipgloss.NewStyle().Foreground(styles.BgLight)
-		}
-
-		barChars = append(barChars, style.Render(char))
-	}
-
-	bar := strings.Join(barChars, "")
+	bar := renderShimmerBar(barWidth, frame, 120, accentColor, false)
 
 	indent := "    "
 
@@ -480,6 +442,7 @@ func SimpleQuotaBarLoading(label string, width int, frame int) string {
 	)
 }
 
+// SimpleTimeBarLoading renders a loading state for the time bar.
 func SimpleTimeBarLoading(label string, width int, frame int) string {
 	const (
 		indentWidth  = 4
@@ -506,40 +469,7 @@ func SimpleTimeBarLoading(label string, width int, frame int) string {
 		accentColor = styles.Primary
 	}
 
-	t := float64(frame%cycle) / float64(cycle)
-	var p float64
-	if t < 0.5 {
-		p = t * 2
-	} else {
-		p = (1 - t) * 2
-	}
-	eased := p * p * (3 - 2*p)
-	shimmerPos := int((1.0 - eased) * float64(barWidth))
-
-	var barChars []string
-	for i := 0; i < barWidth; i++ {
-		dist := shimmerPos - i
-		if dist < 0 {
-			dist = -dist
-		}
-
-		var char string
-		var style lipgloss.Style
-
-		if dist < 3 {
-			char = "▓"
-			style = lipgloss.NewStyle().Foreground(accentColor)
-		} else if dist < 5 {
-			char = "▒"
-			style = lipgloss.NewStyle().Foreground(styles.TextSecondary)
-		} else {
-			char = "░"
-			style = lipgloss.NewStyle().Foreground(styles.BgLight)
-		}
-
-		barChars = append(barChars, style.Render(char))
-	}
-	bar := strings.Join(barChars, "")
+	bar := renderShimmerBar(barWidth, frame, cycle, accentColor, true)
 
 	indent := "    "
 
@@ -562,4 +492,49 @@ func SimpleTimeBarLoading(label string, width int, frame int) string {
 		" ",
 		depleteStr,
 	)
+}
+
+func renderShimmerBar(width int, frame, cycle int, accentColor lipgloss.Color, reverse bool) string {
+	t := float64(frame%cycle) / float64(cycle)
+	var p float64
+	if t < 0.5 {
+		p = t * 2
+	} else {
+		p = (1 - t) * 2
+	}
+	eased := p * p * (3 - 2*p)
+
+	var shimmerPos int
+	if reverse {
+		shimmerPos = int((1.0 - eased) * float64(width))
+	} else {
+		shimmerPos = int(eased * float64(width))
+	}
+
+	var barChars []string
+	for i := 0; i < width; i++ {
+		dist := shimmerPos - i
+		if dist < 0 {
+			dist = -dist
+		}
+
+		var char string
+		var style lipgloss.Style
+
+		switch {
+		case dist < 3:
+			char = "▓"
+			style = lipgloss.NewStyle().Foreground(accentColor)
+		case dist < 5:
+			char = "▒"
+			style = lipgloss.NewStyle().Foreground(styles.TextSecondary)
+		default:
+			char = "░"
+			style = lipgloss.NewStyle().Foreground(styles.BgLight)
+		}
+
+		barChars = append(barChars, style.Render(char))
+	}
+
+	return strings.Join(barChars, "")
 }

@@ -55,7 +55,7 @@ func TestCalculateProjections_WithData(t *testing.T) {
 	defer database.Close()
 
 	now := time.Now().UTC()
-	for i := 0; i < 30; i++ {
+	for i := range 30 {
 		snapshot := &models.AggregatedSnapshot{
 			Email:          "test@example.com",
 			BucketTime:     now.Add(time.Duration(-i*5) * time.Minute).Truncate(5 * time.Minute),
@@ -216,7 +216,7 @@ func TestProjectionStatus(t *testing.T) {
 	defer database.Close()
 
 	now := time.Now().UTC()
-	for i := 0; i < 30; i++ {
+	for i := range 30 {
 		snapshot := &models.AggregatedSnapshot{
 			Email:          "test@example.com",
 			BucketTime:     now.Add(time.Duration(-i*5) * time.Minute).Truncate(5 * time.Minute),

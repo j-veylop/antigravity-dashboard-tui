@@ -43,13 +43,7 @@ func (m *Model) renderTitle() string {
 
 // renderConfigCard renders the configuration paths card.
 func (m *Model) renderConfigCard() string {
-	cardWidth := m.width - 6
-	if cardWidth < 50 {
-		cardWidth = 50
-	}
-	if cardWidth > 80 {
-		cardWidth = 80
-	}
+	cardWidth := min(max(m.width-6, 50), 80)
 
 	var rows []string
 	rows = append(rows, styles.CardTitleStyle.Render("Configuration"))
@@ -85,13 +79,7 @@ func (m *Model) renderConfigRow(label, value string) string {
 
 // renderAboutCard renders the about/version information card.
 func (m *Model) renderAboutCard() string {
-	cardWidth := m.width - 6
-	if cardWidth < 50 {
-		cardWidth = 50
-	}
-	if cardWidth > 80 {
-		cardWidth = 80
-	}
+	cardWidth := min(max(m.width-6, 50), 80)
 
 	var rows []string
 	rows = append(rows, styles.CardTitleStyle.Render("About Antigravity Dashboard TUI"))

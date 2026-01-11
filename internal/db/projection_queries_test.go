@@ -90,7 +90,7 @@ func TestGetSessionSnapshots(t *testing.T) {
 	defer db.Close()
 
 	now := time.Now().UTC()
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		snapshot := &models.AggregatedSnapshot{
 			Email:          "test@example.com",
 			BucketTime:     now.Add(time.Duration(-i) * time.Hour).Truncate(5 * time.Minute),
@@ -137,7 +137,7 @@ func TestGetConsumptionRates_WithData(t *testing.T) {
 	defer db.Close()
 
 	now := time.Now().UTC()
-	for i := 0; i < 12; i++ {
+	for i := range 12 {
 		snapshot := &models.AggregatedSnapshot{
 			Email:          "test@example.com",
 			BucketTime:     now.Add(time.Duration(-i*5) * time.Minute).Truncate(5 * time.Minute),

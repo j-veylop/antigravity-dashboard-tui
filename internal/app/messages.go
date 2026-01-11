@@ -115,10 +115,12 @@ type AccountsChangedEventMsg struct {
 	Event services.AccountsChangedEvent
 }
 
+// QuotaUpdatedEventMsg is a message indicating a quota update.
 type QuotaUpdatedEventMsg struct {
 	Event services.QuotaUpdatedEvent
 }
 
+// ProjectionUpdatedMsg is a message indicating a projection update.
 type ProjectionUpdatedMsg struct {
 	Email      string
 	Projection *models.AccountProjection

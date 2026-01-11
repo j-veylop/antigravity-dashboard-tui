@@ -592,31 +592,25 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 		return nil
 
 	case key.Matches(msg, m.keymap.Tab1):
-		m.activeTab = TabDashboard
-		m.updateTabSizes()
-		return nil
+		return func() tea.Msg { return TabSwitchMsg{Tab: TabDashboard} }
 
 	case key.Matches(msg, m.keymap.Tab2):
-		m.activeTab = TabHistory
-		m.updateTabSizes()
-		return nil
+		return func() tea.Msg { return TabSwitchMsg{Tab: TabHistory} }
 
 	case key.Matches(msg, m.keymap.Tab3):
-		m.activeTab = TabInfo
-		m.updateTabSizes()
-		return nil
+		return func() tea.Msg { return TabSwitchMsg{Tab: TabInfo} }
 
 	case key.Matches(msg, m.keymap.NextTab):
 		if !m.showHelp {
-			m.activeTab = TabID((int(m.activeTab) + 1) % len(m.tabs))
-			m.updateTabSizes()
+			newTab := TabID((int(m.activeTab) + 1) % len(m.tabs))
+			return func() tea.Msg { return TabSwitchMsg{Tab: newTab} }
 		}
 		return nil
 
 	case key.Matches(msg, m.keymap.PrevTab):
 		if !m.showHelp {
-			m.activeTab = TabID((int(m.activeTab) - 1 + len(m.tabs)) % len(m.tabs))
-			m.updateTabSizes()
+			newTab := TabID((int(m.activeTab) - 1 + len(m.tabs)) % len(m.tabs))
+			return func() tea.Msg { return TabSwitchMsg{Tab: newTab} }
 		}
 		return nil
 

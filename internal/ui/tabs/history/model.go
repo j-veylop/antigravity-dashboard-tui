@@ -147,13 +147,19 @@ func (m *Model) Update(msg tea.Msg) (app.Tab, tea.Cmd) {
 		m.errorMsg = msg.err
 		cmds = append(cmds, func() tea.Msg {
 			return app.AddNotificationMsg{
-				Type:    app.NotificationError,
-				Message: fmt.Sprintf("History error: %s", msg.err),
+				Type:     app.NotificationError,
+				Message:  fmt.Sprintf("History error: %s", msg.err),
+				Duration: app.LongNotificationDuration,
 			}
 		})
 
 	case app.AccountsLoadedMsg:
 		return m.handleAccountsLoaded()
+
+	case app.TabSwitchMsg:
+		if msg.Tab == app.TabHistory {
+			return m.handleAccountsLoaded()
+		}
 
 	case tea.KeyMsg:
 		return m.handleKeyMsg(msg)

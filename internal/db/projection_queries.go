@@ -9,6 +9,7 @@ import (
 	"github.com/j-veylop/antigravity-dashboard-tui/internal/models"
 )
 
+// UpsertAggregatedSnapshot inserts or updates an aggregated snapshot.
 func (db *DB) UpsertAggregatedSnapshot(snapshot *models.AggregatedSnapshot) error {
 	query := `
 		INSERT INTO quota_snapshots_agg (
@@ -16,8 +17,10 @@ func (db *DB) UpsertAggregatedSnapshot(snapshot *models.AggregatedSnapshot) erro
 			claude_consumed, gemini_consumed, sample_count, session_id, tier
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(email, bucket_time) DO UPDATE SET
-			claude_quota_avg = (quota_snapshots_agg.claude_quota_avg * quota_snapshots_agg.sample_count + excluded.claude_quota_avg) / (quota_snapshots_agg.sample_count + 1),
-			gemini_quota_avg = (quota_snapshots_agg.gemini_quota_avg * quota_snapshots_agg.sample_count + excluded.gemini_quota_avg) / (quota_snapshots_agg.sample_count + 1),
+			claude_quota_avg = (quota_snapshots_agg.claude_quota_avg * quota_snapshots_agg.sample_count +
+				excluded.claude_quota_avg) / (quota_snapshots_agg.sample_count + 1),
+			gemini_quota_avg = (quota_snapshots_agg.gemini_quota_avg * quota_snapshots_agg.sample_count +
+				excluded.gemini_quota_avg) / (quota_snapshots_agg.sample_count + 1),
 			claude_consumed = quota_snapshots_agg.claude_consumed + excluded.claude_consumed,
 			gemini_consumed = quota_snapshots_agg.gemini_consumed + excluded.gemini_consumed,
 			sample_count = quota_snapshots_agg.sample_count + 1,
@@ -27,7 +30,7 @@ func (db *DB) UpsertAggregatedSnapshot(snapshot *models.AggregatedSnapshot) erro
 
 	result, err := db.ExecContext(context.Background(), query,
 		snapshot.Email,
-		snapshot.BucketTime,
+		snapshot.BucketTime.Format("2006-01-02 15:04:05"),
 		snapshot.ClaudeQuotaAvg,
 		snapshot.GeminiQuotaAvg,
 		snapshot.ClaudeConsumed,
@@ -50,6 +53,7 @@ func (db *DB) UpsertAggregatedSnapshot(snapshot *models.AggregatedSnapshot) erro
 	return nil
 }
 
+// GetSessionSnapshots retrieves recent snapshots for a session window.
 func (db *DB) GetSessionSnapshots(email string, sessionWindow time.Duration) ([]models.AggregatedSnapshot, error) {
 	query := `
 		SELECT id, email, bucket_time, claude_quota_avg, gemini_quota_avg,
@@ -84,6 +88,7 @@ func (db *DB) GetSessionSnapshots(email string, sessionWindow time.Duration) ([]
 	return snapshots, rows.Err()
 }
 
+// GetConsumptionRates calculates consumption rates for a session.
 func (db *DB) GetConsumptionRates(email string, sessionID string) (*models.ConsumptionRates, error) {
 	rates := &models.ConsumptionRates{Email: email}
 
@@ -134,6 +139,7 @@ func (db *DB) GetConsumptionRates(email string, sessionID string) (*models.Consu
 	return rates, nil
 }
 
+// GetLastAggregatedSnapshot returns the most recent aggregated snapshot.
 func (db *DB) GetLastAggregatedSnapshot(email string) (*models.AggregatedSnapshot, error) {
 	query := `
 		SELECT id, email, bucket_time, claude_quota_avg, gemini_quota_avg,
@@ -160,6 +166,7 @@ func (db *DB) GetLastAggregatedSnapshot(email string) (*models.AggregatedSnapsho
 	return &s, nil
 }
 
+// CleanupOldRawSnapshots deletes old raw snapshots.
 func (db *DB) CleanupOldRawSnapshots(olderThanDays int) (int64, error) {
 	query := `DELETE FROM quota_snapshots WHERE timestamp < datetime('now', ?)`
 	windowStr := fmt.Sprintf("-%d days", olderThanDays)

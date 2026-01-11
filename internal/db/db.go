@@ -8,7 +8,9 @@ import (
 	"os"
 	"path/filepath"
 
+	// Import modernc.org/sqlite as a blank import to register the driver
 	_ "modernc.org/sqlite"
+	// sqlite driver
 )
 
 // DB wraps the SQL database connection with application-specific methods.
@@ -54,6 +56,12 @@ func New(path string) (*DB, error) {
 	if err := db.createSchema(); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("failed to create schema: %w", err)
+	}
+
+	// Fix legacy time formats
+	if err := db.FixLegacyTimeFormats(); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("failed to fix legacy time formats: %w", err)
 	}
 
 	return db, nil

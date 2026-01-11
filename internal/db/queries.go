@@ -26,7 +26,7 @@ func (db *DB) InsertAPICall(call *models.APICall) error {
 	}
 
 	result, err := db.ExecContext(context.Background(), query,
-		timestamp,
+		timestamp.Format("2006-01-02 15:04:05"),
 		call.Email,
 		call.Model,
 		call.Provider,
@@ -287,7 +287,7 @@ func (db *DB) InsertQuotaSnapshot(snapshot *models.QuotaSnapshot) error {
 		snapshot.TotalQuota,
 		snapshot.Tier,
 		snapshot.IsRateLimited,
-		timestamp,
+		timestamp.Format("2006-01-02 15:04:05"),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to insert quota snapshot: %w", err)

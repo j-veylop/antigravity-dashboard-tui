@@ -13,7 +13,7 @@ type ModelQuota struct {
 	Remaining        int64     `json:"remaining,omitempty"`
 	UsagePercentage  float64   `json:"usagePercentage,omitempty"`
 	IsRateLimited    bool      `json:"isRateLimited,omitempty"`
-	LastUpdated      time.Time `json:"lastUpdated,omitempty"`
+	LastUpdated      time.Time `json:"lastUpdated"`
 	SubscriptionTier string    `json:"subscriptionTier,omitempty"`
 }
 

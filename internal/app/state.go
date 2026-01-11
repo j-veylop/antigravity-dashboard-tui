@@ -2,6 +2,7 @@
 package app
 
 import (
+	"maps"
 	"sync"
 	"time"
 
@@ -385,9 +386,7 @@ func (s *State) GetProjections() map[string]*models.AccountProjection {
 		return nil
 	}
 	result := make(map[string]*models.AccountProjection, len(s.Projections))
-	for k, v := range s.Projections {
-		result[k] = v
-	}
+	maps.Copy(result, s.Projections)
 	return result
 }
 

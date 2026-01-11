@@ -59,10 +59,7 @@ func RenderDualLineChart(claude, gemini []float64, width, height int, caption st
 	}
 
 	// Normalize lengths - pad shorter array with zeros
-	maxLen := len(claude)
-	if len(gemini) > maxLen {
-		maxLen = len(gemini)
-	}
+	maxLen := max(len(gemini), len(claude))
 
 	claudeData := make([]float64, maxLen)
 	geminiData := make([]float64, maxLen)
@@ -110,10 +107,9 @@ func RenderBarChart(values []float64, labels []string, width int) string {
 		}
 	}
 
-	barWidth := width - maxLabelLen - 10 // Leave room for label and value
-	if barWidth < 10 {
-		barWidth = 10
-	}
+	barWidth := max(
+		// Leave room for label and value
+		width-maxLabelLen-10, 10)
 
 	var lines []string
 	for i, v := range values {
@@ -126,10 +122,7 @@ func RenderBarChart(values []float64, labels []string, width int) string {
 		paddedLabel := fmt.Sprintf("%*s", maxLabelLen, label)
 
 		// Calculate bar length
-		barLen := int((v / maxVal) * float64(barWidth))
-		if barLen < 0 {
-			barLen = 0
-		}
+		barLen := max(int((v/maxVal)*float64(barWidth)), 0)
 
 		bar := strings.Repeat("█", barLen)
 		barColored := lipgloss.NewStyle().Foreground(ChartPrimaryColor).Render(bar)

@@ -52,10 +52,7 @@ func (m *Model) renderTitle() string {
 func (m *Model) renderQuotaList() string {
 	accounts := m.state.GetAccounts()
 
-	cardWidth := m.width - 6
-	if cardWidth < 40 {
-		cardWidth = 40
-	}
+	cardWidth := max(m.width-6, 40)
 
 	var rows []string
 
@@ -74,10 +71,7 @@ func (m *Model) renderQuotaList() string {
 		)
 	}
 
-	dividerWidth := cardWidth - 8
-	if dividerWidth < 20 {
-		dividerWidth = 20
-	}
+	dividerWidth := max(cardWidth-8, 20)
 	divider := lipgloss.NewStyle().Foreground(styles.Subtle).Render(
 		"  ├" + strings.Repeat("─", dividerWidth) + "┤",
 	)
@@ -108,10 +102,7 @@ func (m *Model) renderAccountRow(acc models.AccountWithQuota, selected bool, wid
 	lines = append(lines, "")
 
 	// Quota bars
-	contentWidth := width - 4
-	if contentWidth < 20 {
-		contentWidth = 20
-	}
+	contentWidth := max(width-4, 20)
 
 	switch {
 	case acc.QuotaInfo == nil:
@@ -219,10 +210,7 @@ func (m *Model) calculateDisplayQuotas(
 			if claudePercent < 0 || currentPercent < claudePercent {
 				claudePercent = currentPercent
 				if !mq.ResetTime.IsZero() {
-					claudeResetSec = int64(time.Until(mq.ResetTime).Seconds())
-					if claudeResetSec < 0 {
-						claudeResetSec = 0
-					}
+					claudeResetSec = max(int64(time.Until(mq.ResetTime).Seconds()), 0)
 				}
 			}
 		case "gemini":
@@ -234,10 +222,7 @@ func (m *Model) calculateDisplayQuotas(
 			if geminiPercent < 0 || currentPercent < geminiPercent {
 				geminiPercent = currentPercent
 				if !mq.ResetTime.IsZero() {
-					geminiResetSec = int64(time.Until(mq.ResetTime).Seconds())
-					if geminiResetSec < 0 {
-						geminiResetSec = 0
-					}
+					geminiResetSec = max(int64(time.Until(mq.ResetTime).Seconds()), 0)
 				}
 			}
 		}
@@ -331,10 +316,7 @@ func (m *Model) renderQuotaBarWithTime(
 	)
 
 	rightSideWidth := percentWidth + rateWidth + badgeWidth
-	barWidth := width - indentWidth - rightSideWidth - 4
-	if barWidth < 10 {
-		barWidth = 10
-	}
+	barWidth := max(width-indentWidth-rightSideWidth-4, 10)
 
 	line1 := m.renderQuotaBarFirstLine(percent, barWidth, percentWidth, rateWidth, badgeWidth, proj)
 
@@ -505,10 +487,7 @@ func (m *Model) renderTotalBar(percent float64, width int) string {
 	)
 
 	rightSideWidth := percentWidth + rateWidth + badgeWidth
-	barWidth := width - indentWidth - rightSideWidth - 4
-	if barWidth < 10 {
-		barWidth = 10
-	}
+	barWidth := max(width-indentWidth-rightSideWidth-4, 10)
 
 	indent := indentSpace
 

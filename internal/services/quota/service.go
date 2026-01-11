@@ -2,6 +2,7 @@ package quota
 
 import (
 	"fmt"
+	"maps"
 	"sync"
 	"time"
 
@@ -127,7 +128,7 @@ func (s *Service) GetAccessToken(email string) (string, error) {
 
 	// Retry with exponential backoff
 	backoff := 500 * time.Millisecond
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		tokenResp, err = RefreshAccessToken(refreshToken, s.config.ClientID, s.config.ClientSecret)
 		if err == nil {
 			break
@@ -261,9 +262,7 @@ func (s *Service) GetAllQuotas() map[string]*models.QuotaInfo {
 	defer s.mu.RUnlock()
 
 	result := make(map[string]*models.QuotaInfo, len(s.quotaCache))
-	for k, v := range s.quotaCache {
-		result[k] = v
-	}
+	maps.Copy(result, s.quotaCache)
 	return result
 }
 

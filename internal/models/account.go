@@ -3,6 +3,7 @@ package models
 
 import (
 	"encoding/json"
+	"maps"
 	"time"
 )
 
@@ -15,12 +16,12 @@ type Account struct {
 	Picture             string           `json:"picture,omitempty"`
 	RefreshToken        string           `json:"refreshToken"`
 	AccessToken         string           `json:"accessToken,omitempty"`
-	ExpiresAt           time.Time        `json:"expiresAt,omitempty"`
+	ExpiresAt           time.Time        `json:"expiresAt"`
 	ProjectID           string           `json:"projectId,omitempty"`
 	ManagedProjectID    string           `json:"managedProjectId,omitempty"`
 	IsActive            bool             `json:"isActive,omitempty"`
-	AddedAt             time.Time        `json:"addedAt,omitempty"`
-	LastUsed            time.Time        `json:"lastUsed,omitempty"`
+	AddedAt             time.Time        `json:"addedAt"`
+	LastUsed            time.Time        `json:"lastUsed"`
 	RateLimitResetTimes map[string]int64 `json:"rateLimitResetTimes,omitempty"`
 }
 
@@ -53,9 +54,7 @@ func (a *Account) Clone() Account {
 
 	if a.RateLimitResetTimes != nil {
 		clone.RateLimitResetTimes = make(map[string]int64, len(a.RateLimitResetTimes))
-		for k, v := range a.RateLimitResetTimes {
-			clone.RateLimitResetTimes[k] = v
-		}
+		maps.Copy(clone.RateLimitResetTimes, a.RateLimitResetTimes)
 	}
 
 	return clone

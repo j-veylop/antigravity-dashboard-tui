@@ -11,6 +11,8 @@ import (
 	"github.com/j-veylop/antigravity-dashboard-tui/internal/ui/styles"
 )
 
+const notAvailable = "N/A"
+
 // View renders the history tab.
 func (m *Model) View() string {
 	if m.loading {
@@ -147,7 +149,7 @@ func (m *Model) renderSummaryCard() string {
 	))
 
 	// Second row
-	avgExhaust := "N/A"
+	avgExhaust := notAvailable
 	if h.Exhaustion.AvgTimeToExhaust > 0 {
 		avgExhaust = formatDuration(h.Exhaustion.AvgTimeToExhaust)
 	}
@@ -233,10 +235,10 @@ func (m *Model) renderExhaustionCard() string {
 		rows = append(rows, styles.HelpStyle.Render("  No session data available"))
 	} else {
 		// Time stats
-		avgStr := "N/A"
-		medianStr := "N/A"
-		minStr := "N/A"
-		maxStr := "N/A"
+		avgStr := notAvailable
+		medianStr := notAvailable
+		minStr := notAvailable
+		maxStr := notAvailable
 
 		if ex.AvgTimeToExhaust > 0 {
 			avgStr = formatDuration(ex.AvgTimeToExhaust)
@@ -439,7 +441,7 @@ func (m *Model) renderWeeklyPattern() string {
 
 func formatDuration(d time.Duration) string {
 	if d <= 0 {
-		return "N/A"
+		return notAvailable
 	}
 
 	hours := int(d.Hours())

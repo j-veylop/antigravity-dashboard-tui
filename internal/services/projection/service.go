@@ -1,3 +1,6 @@
+// Package projection provides quota exhaustion time projection calculations
+// based on historical usage data. It analyzes consumption rates over time
+// to predict when API quotas will be depleted.
 package projection
 
 import (

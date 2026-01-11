@@ -1,10 +1,10 @@
 package components
 
 import (
-	"github.com/j-veylop/antigravity-dashboard-tui/internal/ui/styles"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/j-veylop/antigravity-dashboard-tui/internal/ui/styles"
 )
 
 // LoadingSpinner wraps a bubble spinner with label support.

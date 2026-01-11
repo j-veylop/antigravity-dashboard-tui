@@ -112,7 +112,7 @@ func (m *Model) renderAddForm() string {
 	rows = append(rows, "")
 
 	// Email field
-	emailLabel := "Email:"
+	var emailLabel string
 	if m.focusedField == fieldEmail {
 		emailLabel = styles.FocusedStyle.Render("> Email:")
 	} else {
@@ -128,7 +128,7 @@ func (m *Model) renderAddForm() string {
 	rows = append(rows, "")
 
 	// Refresh token field
-	tokenLabel := "Refresh Token:"
+	var tokenLabel string
 	if m.focusedField == fieldRefreshToken {
 		tokenLabel = styles.FocusedStyle.Render("> Refresh Token:")
 	} else {

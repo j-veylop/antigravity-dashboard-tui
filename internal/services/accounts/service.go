@@ -347,14 +347,8 @@ func (s *Service) parseAccounts(data []byte) ([]models.Account, string, error) {
 		for i, raw := range rawFile.Accounts {
 			modelAcc := raw.ToAccount()
 
-			id := modelAcc.ProjectID
-			email := modelAcc.Email
-			if email == "" {
-				email = modelAcc.ProjectID
-			}
-
 			accounts[i] = modelAcc
-			accounts[i].ID = id
+			accounts[i].ID = modelAcc.ProjectID
 			accounts[i].IsActive = true
 		}
 
@@ -508,12 +502,14 @@ func (s *Service) watchLoop() {
 			// Handle write/create events
 			if event.Op&(fsnotify.Write|fsnotify.Create) != 0 {
 				// Debounce rapid changes
+				s.mu.Lock()
 				if s.debounceTimer != nil {
 					s.debounceTimer.Stop()
 				}
 				s.debounceTimer = time.AfterFunc(debounceInterval, func() {
 					s.handleFileChange()
 				})
+				s.mu.Unlock()
 			}
 
 		case err, ok := <-s.watcher.Errors:
@@ -592,9 +588,11 @@ func (s *Service) sendEvent(event Event) {
 func (s *Service) Close() error {
 	close(s.stopChan)
 
+	s.mu.Lock()
 	if s.debounceTimer != nil {
 		s.debounceTimer.Stop()
 	}
+	s.mu.Unlock()
 
 	if s.watcher != nil {
 		return s.watcher.Close()

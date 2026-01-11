@@ -1,3 +1,4 @@
+// Package app implements the main Bubble Tea application with tab-based navigation.
 package app
 
 import (
@@ -443,146 +444,198 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.width = msg.Width
-		m.height = msg.Height
-		m.ready = true
-		m.updateTabSizes()
-
+		m.handleWindowSize(msg)
 	case tea.KeyMsg:
-		cmd := m.handleKeyMsg(msg)
-		if cmd != nil {
+		if cmd := m.handleKeyMsg(msg); cmd != nil {
 			cmds = append(cmds, cmd)
 		}
-
 	case spinner.TickMsg:
-		var cmd tea.Cmd
-		m.spinner, cmd = m.spinner.Update(msg)
-		cmds = append(cmds, cmd)
-
+		cmds = append(cmds, m.handleSpinnerTick(msg))
 	case TickMsg:
-		m.state.ClearExpiredNotifications()
-		cmds = append(cmds, defaultTickCmd())
-
+		cmds = append(cmds, m.handleTick())
 	case SubscriptionEventMsg:
-		m.eventChannel = msg.Channel
-		cmds = append(cmds, waitForServiceEventCmd(m.eventChannel))
-		// Reload accounts now that subscription is active to catch any events we might have missed
-		if m.services != nil {
-			cmds = append(cmds, loadAccountsCmd(m.services))
-		}
-
+		cmds = append(cmds, m.handleSubscriptionEvent(msg)...)
 	case ServiceEventMsg:
-		cmd := m.handleServiceEvent(msg.Event)
-		if cmd != nil {
-			cmds = append(cmds, cmd)
-		}
-		if m.eventChannel != nil {
-			cmds = append(cmds, waitForServiceEventCmd(m.eventChannel))
-		}
-
+		cmds = append(cmds, m.handleServiceEventMsg(msg)...)
 	case AccountsLoadedMsg:
-		m.state.SetLoading("initial", false)
-		m.state.SetLoading("accounts", false)
-		m.state.SetAccounts(msg.Accounts)
-		m.state.SetStats(msg.Stats)
-		if !m.state.AnyLoading() {
-			m.state.ClearLoadingNotification()
-		}
-
+		m.handleAccountsLoaded(msg)
 	case StatsLoadedMsg:
-		m.state.SetLoading("stats", false)
-		m.state.SetStats(msg.Stats)
-
+		m.handleStatsLoaded(msg)
 	case QuotaRefreshedMsg:
-		m.state.SetLoading("quota", false)
-		if msg.Error != nil {
-			cmds = append(cmds, notifyErrorCmd(fmt.Sprintf("Failed to refresh quota: %v", msg.Error)))
-		} else {
-			cmds = append(cmds, notifySuccessCmd(fmt.Sprintf("Quota refreshed for %s", msg.Email)))
-		}
-		if m.services != nil {
-			cmds = append(cmds, loadAccountsCmd(m.services))
-		}
-
+		cmds = append(cmds, m.handleQuotaRefreshed(msg)...)
 	case SwitchAccountResultMsg:
-		if msg.Success {
-			cmds = append(cmds, notifySuccessCmd(fmt.Sprintf("Switched to %s", msg.Email)))
-			if m.services != nil {
-				cmds = append(cmds, loadAccountsCmd(m.services))
-			}
-		} else {
-			cmds = append(cmds, notifyErrorCmd(fmt.Sprintf("Failed to switch account: %v", msg.Error)))
-		}
-
+		cmds = append(cmds, m.handleSwitchAccountResult(msg)...)
 	case DeleteAccountResultMsg:
-		if msg.Success {
-			cmds = append(cmds, notifySuccessCmd(fmt.Sprintf("Deleted account %s", msg.Email)))
-			if m.services != nil {
-				cmds = append(cmds, loadAccountsCmd(m.services))
-			}
-		} else {
-			cmds = append(cmds, notifyErrorCmd(fmt.Sprintf("Failed to delete account: %v", msg.Error)))
-		}
-
+		cmds = append(cmds, m.handleDeleteAccountResult(msg)...)
 	case AddNotificationMsg:
-		id := m.state.AddNotification(msg.Type, msg.Message, msg.Duration)
-		if msg.Duration > 0 {
-			cmds = append(cmds, clearNotificationCmd(id, msg.Duration))
-		}
-
+		cmds = append(cmds, m.handleAddNotification(msg)...)
 	case RemoveNotificationMsg:
 		m.state.RemoveNotification(msg.ID)
-
 	case ClearExpiredNotificationsMsg:
 		m.state.ClearExpiredNotifications()
-
 	case StartLoadingMsg:
-		m.state.SetLoading(msg.Resource, true)
-		m.state.SetLoadingNotification("Refreshing...")
-
+		m.handleStartLoading(msg)
 	case StopLoadingMsg:
-		m.state.SetLoading(msg.Resource, false)
-		if !m.state.AnyLoading() {
-			m.state.ClearLoadingNotification()
-		}
-
+		m.handleStopLoading(msg)
 	case ErrorMsg:
 		cmds = append(cmds, notifyErrorCmd(msg.Error.Error()))
-
 	case RefreshMsg:
-		if m.services != nil {
-			// Notify loading start to trigger animations
-			cmds = append(cmds, func() tea.Msg { return StartLoadingMsg(msg) })
-
-			switch msg.Resource {
-			case "all":
-				cmds = append(cmds, loadAccountsCmd(m.services))
-			case "accounts":
-				cmds = append(cmds, loadAccountsCmd(m.services))
-			case "quota":
-				cmds = append(cmds, refreshAllQuotaCmd(m.services))
-			case "stats":
-				cmds = append(cmds, loadStatsCmd(m.services))
-			}
-		}
-
+		cmds = append(cmds, m.handleRefresh(msg)...)
 	case TabSwitchMsg:
 		m.activeTab = msg.Tab
 		m.updateTabSizes()
-
 	case ToggleHelpMsg:
 		m.showHelp = !m.showHelp
 	}
 
-	if int(m.activeTab) < len(m.tabs) && m.tabs[m.activeTab] != nil {
-		var cmd tea.Cmd
-		m.tabs[m.activeTab], cmd = m.tabs[m.activeTab].Update(msg)
-		if cmd != nil {
-			cmds = append(cmds, cmd)
-		}
+	if cmd := m.updateActiveTab(msg); cmd != nil {
+		cmds = append(cmds, cmd)
 	}
 
 	return m, tea.Batch(cmds...)
+}
+
+func (m *Model) handleWindowSize(msg tea.WindowSizeMsg) {
+	m.width = msg.Width
+	m.height = msg.Height
+	m.ready = true
+	m.updateTabSizes()
+}
+
+func (m *Model) handleSpinnerTick(msg spinner.TickMsg) tea.Cmd {
+	var cmd tea.Cmd
+	m.spinner, cmd = m.spinner.Update(msg)
+	return cmd
+}
+
+func (m *Model) handleTick() tea.Cmd {
+	m.state.ClearExpiredNotifications()
+	return defaultTickCmd()
+}
+
+func (m *Model) handleSubscriptionEvent(msg SubscriptionEventMsg) []tea.Cmd {
+	var cmds []tea.Cmd
+	m.eventChannel = msg.Channel
+	cmds = append(cmds, waitForServiceEventCmd(m.eventChannel))
+	if m.services != nil {
+		cmds = append(cmds, loadAccountsCmd(m.services))
+	}
+	return cmds
+}
+
+func (m *Model) handleServiceEventMsg(msg ServiceEventMsg) []tea.Cmd {
+	var cmds []tea.Cmd
+	if cmd := m.handleServiceEvent(msg.Event); cmd != nil {
+		cmds = append(cmds, cmd)
+	}
+	if m.eventChannel != nil {
+		cmds = append(cmds, waitForServiceEventCmd(m.eventChannel))
+	}
+	return cmds
+}
+
+func (m *Model) handleAccountsLoaded(msg AccountsLoadedMsg) {
+	m.state.SetLoading("initial", false)
+	m.state.SetLoading("accounts", false)
+	m.state.SetAccounts(msg.Accounts)
+	m.state.SetStats(msg.Stats)
+	if !m.state.AnyLoading() {
+		m.state.ClearLoadingNotification()
+	}
+}
+
+func (m *Model) handleStatsLoaded(msg StatsLoadedMsg) {
+	m.state.SetLoading("stats", false)
+	m.state.SetStats(msg.Stats)
+}
+
+func (m *Model) handleQuotaRefreshed(msg QuotaRefreshedMsg) []tea.Cmd {
+	var cmds []tea.Cmd
+	m.state.SetLoading("quota", false)
+	if msg.Error != nil {
+		cmds = append(cmds, notifyErrorCmd(fmt.Sprintf("Failed to refresh quota: %v", msg.Error)))
+	} else {
+		cmds = append(cmds, notifySuccessCmd(fmt.Sprintf("Quota refreshed for %s", msg.Email)))
+	}
+	if m.services != nil {
+		cmds = append(cmds, loadAccountsCmd(m.services))
+	}
+	return cmds
+}
+
+func (m *Model) handleSwitchAccountResult(msg SwitchAccountResultMsg) []tea.Cmd {
+	var cmds []tea.Cmd
+	if msg.Success {
+		cmds = append(cmds, notifySuccessCmd(fmt.Sprintf("Switched to %s", msg.Email)))
+		if m.services != nil {
+			cmds = append(cmds, loadAccountsCmd(m.services))
+		}
+	} else {
+		cmds = append(cmds, notifyErrorCmd(fmt.Sprintf("Failed to switch account: %v", msg.Error)))
+	}
+	return cmds
+}
+
+func (m *Model) handleDeleteAccountResult(msg DeleteAccountResultMsg) []tea.Cmd {
+	var cmds []tea.Cmd
+	if msg.Success {
+		cmds = append(cmds, notifySuccessCmd(fmt.Sprintf("Deleted account %s", msg.Email)))
+		if m.services != nil {
+			cmds = append(cmds, loadAccountsCmd(m.services))
+		}
+	} else {
+		cmds = append(cmds, notifyErrorCmd(fmt.Sprintf("Failed to delete account: %v", msg.Error)))
+	}
+	return cmds
+}
+
+func (m *Model) handleAddNotification(msg AddNotificationMsg) []tea.Cmd {
+	var cmds []tea.Cmd
+	id := m.state.AddNotification(msg.Type, msg.Message, msg.Duration)
+	if msg.Duration > 0 {
+		cmds = append(cmds, clearNotificationCmd(id, msg.Duration))
+	}
+	return cmds
+}
+
+func (m *Model) handleStartLoading(msg StartLoadingMsg) {
+	m.state.SetLoading(msg.Resource, true)
+	m.state.SetLoadingNotification("Refreshing...")
+}
+
+func (m *Model) handleStopLoading(msg StopLoadingMsg) {
+	m.state.SetLoading(msg.Resource, false)
+	if !m.state.AnyLoading() {
+		m.state.ClearLoadingNotification()
+	}
+}
+
+func (m *Model) handleRefresh(msg RefreshMsg) []tea.Cmd {
+	var cmds []tea.Cmd
+	if m.services == nil {
+		return cmds
+	}
+
+	cmds = append(cmds, func() tea.Msg { return StartLoadingMsg(msg) })
+
+	switch msg.Resource {
+	case "all", "accounts":
+		cmds = append(cmds, loadAccountsCmd(m.services))
+	case "quota":
+		cmds = append(cmds, refreshAllQuotaCmd(m.services))
+	case "stats":
+		cmds = append(cmds, loadStatsCmd(m.services))
+	}
+	return cmds
+}
+
+func (m *Model) updateActiveTab(msg tea.Msg) tea.Cmd {
+	if int(m.activeTab) < len(m.tabs) && m.tabs[m.activeTab] != nil {
+		var cmd tea.Cmd
+		m.tabs[m.activeTab], cmd = m.tabs[m.activeTab].Update(msg)
+		return cmd
+	}
+	return nil
 }
 
 func (m *Model) updateTabSizes() {

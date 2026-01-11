@@ -194,9 +194,8 @@ func (m *Model) Update(msg tea.Msg) (app.Tab, tea.Cmd) {
 func (m *Model) updateAddForm(msg tea.Msg) (app.Tab, tea.Cmd) {
 	var cmds []tea.Cmd
 
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.String() {
+	if keyMsg, ok := msg.(tea.KeyMsg); ok {
+		switch keyMsg.String() {
 		case "esc":
 			m.adding = false
 			m.emailInput.Blur()
@@ -262,9 +261,8 @@ func (m *Model) updateAddForm(msg tea.Msg) (app.Tab, tea.Cmd) {
 
 // updateDeleteConfirm handles the delete confirmation.
 func (m *Model) updateDeleteConfirm(msg tea.Msg) (app.Tab, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.String() {
+	if keyMsg, ok := msg.(tea.KeyMsg); ok {
+		switch keyMsg.String() {
 		case "y", "Y":
 			m.confirmDelete = false
 			email := m.deleteEmail

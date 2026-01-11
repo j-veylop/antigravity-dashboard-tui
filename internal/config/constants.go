@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 )
 
 type AntigravityConstants struct {
@@ -27,7 +28,18 @@ func LoadAntigravityConstants() *AntigravityConstants {
 		return nil
 	}
 
-	content, err := os.ReadFile(path)
+	// Validate path is within expected directory for security
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil
+	}
+	expectedPrefix := filepath.Join(home, ".config", "opencode")
+	cleanPath := filepath.Clean(path)
+	if !strings.HasPrefix(cleanPath, expectedPrefix) {
+		return nil
+	}
+
+	content, err := os.ReadFile(cleanPath) // #nosec G304 - path validated above
 	if err != nil {
 		return nil
 	}

@@ -64,7 +64,7 @@ func (db *DB) GetSessionSnapshots(email string, sessionWindow time.Duration) ([]
 	if err != nil {
 		return nil, fmt.Errorf("failed to query session snapshots: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var snapshots []models.AggregatedSnapshot
 	for rows.Next() {

@@ -6,11 +6,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/j-veylop/antigravity-dashboard-tui/internal/logger"
-	"github.com/j-veylop/antigravity-dashboard-tui/internal/ui/styles"
 	"github.com/charmbracelet/bubbles/progress"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/j-veylop/antigravity-dashboard-tui/internal/logger"
+	"github.com/j-veylop/antigravity-dashboard-tui/internal/ui/styles"
 )
 
 type AnimationTickMsg time.Time
@@ -79,8 +79,7 @@ func (q QuotaBar) Init() tea.Cmd {
 func (q QuotaBar) Update(msg tea.Msg) (QuotaBar, tea.Cmd) {
 	var cmds []tea.Cmd
 
-	switch msg.(type) {
-	case AnimationTickMsg:
+	if _, ok := msg.(AnimationTickMsg); ok {
 		if q.isAnimating {
 			q.animationFrame++
 

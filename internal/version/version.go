@@ -1,3 +1,4 @@
+// Package version provides build version information and runtime metadata.
 package version
 
 import (
@@ -6,6 +7,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -14,18 +16,22 @@ var (
 	Version = ""
 	Commit  = ""
 	Date    = ""
+
+	once sync.Once
 )
 
-func init() {
-	if Date == "" {
-		Date = time.Now().Format("2006-01-02")
-	}
-	if Commit == "" {
-		Commit = getGitCommit()
-	}
-	if Version == "" {
-		Version = getGitVersion()
-	}
+func ensureInitialized() {
+	once.Do(func() {
+		if Date == "" {
+			Date = time.Now().Format("2006-01-02")
+		}
+		if Commit == "" {
+			Commit = getGitCommit()
+		}
+		if Version == "" {
+			Version = getGitVersion()
+		}
+	})
 }
 
 func getGitCommit() string {
@@ -52,6 +58,7 @@ func getGitVersion() string {
 }
 
 func Info() string {
+	ensureInitialized()
 	return fmt.Sprintf("antigravity-dashboard-tui %s (commit: %s, built: %s, %s/%s)",
 		Version, Commit, Date, runtime.GOOS, runtime.GOARCH)
 }

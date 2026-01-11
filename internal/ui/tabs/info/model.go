@@ -69,10 +69,9 @@ func (m *Model) Init() tea.Cmd {
 func (m *Model) Update(msg tea.Msg) (app.Tab, tea.Cmd) {
 	var cmds []tea.Cmd
 
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	if keyMsg, ok := msg.(tea.KeyMsg); ok {
 		switch {
-		case key.Matches(msg, m.keys.Copy):
+		case key.Matches(keyMsg, m.keys.Copy):
 			// Copy config path
 			if m.config != nil {
 				return m, func() tea.Msg {
@@ -81,7 +80,7 @@ func (m *Model) Update(msg tea.Msg) (app.Tab, tea.Cmd) {
 			}
 		default:
 			var cmd tea.Cmd
-			m.viewport, cmd = m.viewport.Update(msg)
+			m.viewport, cmd = m.viewport.Update(keyMsg)
 			cmds = append(cmds, cmd)
 		}
 	}

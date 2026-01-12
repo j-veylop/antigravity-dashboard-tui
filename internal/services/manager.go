@@ -11,6 +11,7 @@ import (
 
 	"github.com/j-veylop/antigravity-dashboard-tui/internal/config"
 	"github.com/j-veylop/antigravity-dashboard-tui/internal/db"
+	"github.com/j-veylop/antigravity-dashboard-tui/internal/logger"
 	"github.com/j-veylop/antigravity-dashboard-tui/internal/models"
 	"github.com/j-veylop/antigravity-dashboard-tui/internal/services/accounts"
 	"github.com/j-veylop/antigravity-dashboard-tui/internal/services/projection"
@@ -20,26 +21,26 @@ import (
 type (
 	// AccountsChangedEvent is emitted when the accounts list changes.
 	AccountsChangedEvent struct {
-		Accounts      []models.Account
 		ActiveAccount *models.Account
+		Accounts      []models.Account
 	}
 
 	// QuotaUpdatedEvent is emitted when quota information is updated for an account.
 	QuotaUpdatedEvent struct {
-		AccountEmail string
 		QuotaInfo    *models.QuotaInfo
+		AccountEmail string
 	}
 
 	// ProjectionUpdatedEvent is emitted when projections are updated for an account.
 	ProjectionUpdatedEvent struct {
-		Email      string
 		Projection *models.AccountProjection
+		Email      string
 	}
 
 	// ErrorEvent is emitted when an error occurs in any service.
 	ErrorEvent struct {
-		Service string
 		Error   error
+		Service string
 	}
 
 	// StatsEvent is emitted when global statistics change.
@@ -64,15 +65,15 @@ func (StatsEvent) isServiceEvent()             {}
 
 // Manager orchestrates services and event routing.
 type Manager struct {
-	mu             sync.RWMutex
 	accounts       *accounts.Service
 	quota          *quota.Service
 	projection     *projection.Service
 	database       *db.DB
 	eventChan      chan ServiceEvent
 	stopChan       chan struct{}
-	subscribers    []chan<- ServiceEvent
 	previousQuotas map[string]*models.QuotaInfo
+	subscribers    []chan<- ServiceEvent
+	mu             sync.RWMutex
 }
 
 // NewManager creates a new service manager.
@@ -185,7 +186,9 @@ func (m *Manager) checkNotifications(email string, newQuota *models.QuotaInfo) {
 		if newPercent < 5.0 && oldPercent >= 5.0 {
 			title := fmt.Sprintf("Critical Quota: %s", email)
 			body := fmt.Sprintf("Remaining quota is below 5%% (%.1f%%)", newPercent)
-			_ = beeep.Notify(title, body, "")
+			if err := beeep.Notify(title, body, ""); err != nil {
+				logger.Error("failed to send notification", "error", err)
+			}
 		}
 	}
 
@@ -198,7 +201,9 @@ func (m *Manager) checkNotifications(email string, newQuota *models.QuotaInfo) {
 			if percentDiff > 20.0 {
 				title := fmt.Sprintf("Quota Reset: %s", email)
 				body := "Your quota has been refreshed."
-				_ = beeep.Notify(title, body, "")
+				if err := beeep.Notify(title, body, ""); err != nil {
+					logger.Error("failed to send notification", "error", err)
+				}
 			}
 		}
 	}
@@ -210,7 +215,8 @@ func (m *Manager) updateProjection(email string, quotaInfo *models.QuotaInfo) {
 	var claudeReset, geminiReset time.Time
 	tier := quotaInfo.SubscriptionTier
 
-	for _, mq := range quotaInfo.ModelQuotas {
+	for i := range quotaInfo.ModelQuotas {
+		mq := &quotaInfo.ModelQuotas[i]
 		percent := 0.0
 		if mq.Limit > 0 {
 			percent = float64(mq.Remaining) / float64(mq.Limit) * 100
@@ -231,9 +237,14 @@ func (m *Manager) updateProjection(email string, quotaInfo *models.QuotaInfo) {
 
 	sessionID := m.projection.GetOrCreateSessionID(email, claudeReset)
 
-	_ = m.projection.AggregateSnapshot(email, claudePercent, geminiPercent, tier, sessionID)
+	if err := m.projection.AggregateSnapshot(email, claudePercent, geminiPercent, tier, sessionID); err != nil {
+		logger.Error("failed to aggregate snapshot", "error", err)
+	}
 
-	proj, _ := m.projection.CalculateProjections(email, claudePercent, geminiPercent, claudeReset, geminiReset)
+	proj, err := m.projection.CalculateProjections(email, claudePercent, geminiPercent, claudeReset, geminiReset)
+	if err != nil {
+		logger.Error("failed to calculate projections", "error", err)
+	}
 	if proj != nil {
 		m.broadcast(ProjectionUpdatedEvent{
 			Email:      email,
@@ -308,7 +319,8 @@ func (m *Manager) GetAccountsWithQuota() []models.AccountWithQuota {
 	activeID := m.accounts.GetActiveAccountID()
 
 	result := make([]models.AccountWithQuota, len(accs))
-	for i, acc := range accs {
+	for i := range accs {
+		acc := accs[i]
 		result[i] = models.AccountWithQuota{
 			Account:   acc,
 			QuotaInfo: quotas[acc.Email],
@@ -411,8 +423,8 @@ func (m *Manager) Close() error {
 
 // InitialState returns the initial state of all services for TUI initialization.
 func (m *Manager) InitialState() ([]models.AccountWithQuota, StatsEvent) {
-	accounts := m.GetAccountsWithQuota()
+	accs := m.GetAccountsWithQuota()
 	stats := m.GetStats()
 
-	return accounts, stats
+	return accs, stats
 }

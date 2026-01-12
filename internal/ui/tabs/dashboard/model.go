@@ -59,26 +59,26 @@ func defaultKeyMap() keyMap {
 
 // AnimationState tracks the state of an animation.
 type AnimationState struct {
+	StartTime      time.Time
 	CurrentPercent float64
 	TargetPercent  float64
 	StartPercent   float64
-	StartTime      time.Time
 }
 
 // Model represents the dashboard tab state.
 type Model struct {
 	state          *app.State
+	animations     map[string]*AnimationState
 	width          int
 	height         int
+	selectedIndex  int
+	animationFrame int
 	spinner        components.LoadingSpinner
+	keys           keyMap
+	viewport       viewport.Model
 	claudeQuotaBar components.QuotaBar
 	geminiQuotaBar components.QuotaBar
 	timeBar        components.TimeBar
-	keys           keyMap
-	selectedIndex  int
-	viewport       viewport.Model
-	animations     map[string]*AnimationState
-	animationFrame int
 }
 
 // New creates a new dashboard model.
@@ -103,23 +103,12 @@ func (m *Model) Init() tea.Cmd {
 }
 
 // Update handles messages and updates the model.
-// Update is the main update loop.
-// Update processes messages.
 func (m *Model) Update(msg tea.Msg) (app.Tab, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
 	case animationTickMsg:
-		m.animationFrame++
-		now := time.Time(msg)
-
-		animating, hasPendingData := m.syncAnimationTargets(now)
-		m.stepAnimations(now)
-
-		shouldTick := animating || m.state.AnyLoading() || m.state.IsInitialLoading() || hasPendingData
-		if shouldTick {
-			cmds = append(cmds, animationTickCmd())
-		}
+		cmds = append(cmds, m.handleAnimationTick(msg))
 
 	case app.StartLoadingMsg:
 		cmds = append(cmds, animationTickCmd())
@@ -132,31 +121,7 @@ func (m *Model) Update(msg tea.Msg) (app.Tab, tea.Cmd) {
 		m.state.SetProjection(msg.Email, msg.Projection)
 
 	case tea.KeyMsg:
-		accounts := m.state.GetAccounts()
-		accountCount := len(accounts)
-
-		switch {
-		case key.Matches(msg, m.keys.NextAccount):
-			if accountCount > 0 {
-				m.selectedIndex = (m.selectedIndex + 1) % accountCount
-			}
-		case key.Matches(msg, m.keys.PrevAccount):
-			if accountCount > 0 {
-				m.selectedIndex = (m.selectedIndex - 1 + accountCount) % accountCount
-			}
-		case key.Matches(msg, m.keys.FirstAccount):
-			if accountCount > 0 {
-				m.selectedIndex = 0
-			}
-		case key.Matches(msg, m.keys.LastAccount):
-			if accountCount > 0 {
-				m.selectedIndex = accountCount - 1
-			}
-		default:
-			var cmd tea.Cmd
-			m.viewport, cmd = m.viewport.Update(msg)
-			cmds = append(cmds, cmd)
-		}
+		cmds = append(cmds, m.handleKeyMsg(msg))
 
 	case spinner.TickMsg:
 		var cmd tea.Cmd
@@ -165,6 +130,49 @@ func (m *Model) Update(msg tea.Msg) (app.Tab, tea.Cmd) {
 	}
 
 	return m, tea.Batch(cmds...)
+}
+
+func (m *Model) handleAnimationTick(msg animationTickMsg) tea.Cmd {
+	m.animationFrame++
+	now := time.Time(msg)
+
+	animating, hasPendingData := m.syncAnimationTargets(now)
+	m.stepAnimations(now)
+
+	shouldTick := animating || m.state.AnyLoading() || m.state.IsInitialLoading() || hasPendingData
+	if shouldTick {
+		return animationTickCmd()
+	}
+	return nil
+}
+
+func (m *Model) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
+	accounts := m.state.GetAccounts()
+	accountCount := len(accounts)
+
+	switch {
+	case key.Matches(msg, m.keys.NextAccount):
+		if accountCount > 0 {
+			m.selectedIndex = (m.selectedIndex + 1) % accountCount
+		}
+	case key.Matches(msg, m.keys.PrevAccount):
+		if accountCount > 0 {
+			m.selectedIndex = (m.selectedIndex - 1 + accountCount) % accountCount
+		}
+	case key.Matches(msg, m.keys.FirstAccount):
+		if accountCount > 0 {
+			m.selectedIndex = 0
+		}
+	case key.Matches(msg, m.keys.LastAccount):
+		if accountCount > 0 {
+			m.selectedIndex = accountCount - 1
+		}
+	default:
+		var cmd tea.Cmd
+		m.viewport, cmd = m.viewport.Update(msg)
+		return cmd
+	}
+	return nil
 }
 
 // SetSize sets the available size for the dashboard.
@@ -178,7 +186,8 @@ func (m *Model) SetSize(width, height int) {
 func (m *Model) syncAnimationTargets(now time.Time) (animating, hasPendingData bool) {
 	accounts := m.state.GetAccounts()
 
-	for _, acc := range accounts {
+	for i := range accounts {
+		acc := &accounts[i]
 		if acc.QuotaInfo == nil {
 			hasPendingData = true
 			continue
@@ -201,7 +210,8 @@ func (m *Model) calculateTargets(quotaInfo *models.QuotaInfo) (claudeTarget, gem
 	claudeTarget = -1.0
 	geminiTarget = -1.0
 
-	for _, mq := range quotaInfo.ModelQuotas {
+	for i := range quotaInfo.ModelQuotas {
+		mq := &quotaInfo.ModelQuotas[i]
 		target := 0.0
 		if mq.Limit > 0 && !mq.IsRateLimited {
 			target = float64(mq.Remaining) / float64(mq.Limit) * 100
@@ -221,12 +231,12 @@ func (m *Model) calculateTargets(quotaInfo *models.QuotaInfo) (claudeTarget, gem
 	return claudeTarget, geminiTarget
 }
 
-func (m *Model) updateAnimationState(key string, target float64, now time.Time) bool {
+func (m *Model) updateAnimationState(animKey string, target float64, now time.Time) bool {
 	if target < 0 {
 		return false
 	}
 
-	state, exists := m.animations[key]
+	state, exists := m.animations[animKey]
 	if !exists {
 		state = &AnimationState{
 			CurrentPercent: 0,
@@ -234,7 +244,7 @@ func (m *Model) updateAnimationState(key string, target float64, now time.Time) 
 			TargetPercent:  0,
 			StartTime:      now,
 		}
-		m.animations[key] = state
+		m.animations[animKey] = state
 	}
 
 	if target != state.TargetPercent {

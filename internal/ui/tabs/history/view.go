@@ -25,18 +25,12 @@ func (m *Model) View() string {
 	var sections []string
 
 	// Header with account name and time range selector
-	sections = append(sections, m.renderHeader())
-
-	// Daily consumption chart
-	sections = append(sections, m.renderConsumptionChart())
-
-	// Hourly heatmap
-	// Ensure we don't overflow width with indentation
-	heatmap := m.renderHourlyHeatmap()
-	sections = append(sections, heatmap)
-
-	// Weekly pattern
-	sections = append(sections, m.renderWeeklyPattern())
+	sections = append(sections,
+		m.renderHeader(),
+		m.renderConsumptionChart(),
+		m.renderHourlyHeatmap(),
+		m.renderWeeklyPattern(),
+	)
 
 	content := lipgloss.JoinVertical(lipgloss.Left, sections...)
 	m.viewport.SetContent(content)
@@ -119,8 +113,7 @@ func (m *Model) renderConsumptionChart() string {
 	var rows []string
 
 	titleIcon := lipgloss.NewStyle().Foreground(styles.Primary).Render("📈")
-	rows = append(rows, fmt.Sprintf("%s %s", titleIcon, styles.CardTitleStyle.Render("Daily Consumption")))
-	rows = append(rows, "")
+	rows = append(rows, fmt.Sprintf("%s %s", titleIcon, styles.CardTitleStyle.Render("Daily Consumption")), "")
 
 	daily := m.historyData.DailyUsage
 	if len(daily) == 0 {
@@ -170,8 +163,10 @@ func (m *Model) renderHourlyHeatmap() string {
 	var rows []string
 
 	titleIcon := lipgloss.NewStyle().Foreground(styles.Primary).Render("🕐")
-	rows = append(rows, fmt.Sprintf("%s %s", titleIcon, styles.CardTitleStyle.Render("Hourly Pattern")))
-	rows = append(rows, "")
+	rows = append(rows,
+		fmt.Sprintf("%s %s", titleIcon, styles.CardTitleStyle.Render("Hourly Pattern")),
+		"",
+	)
 
 	hourly := m.historyData.HourlyPatterns
 	if len(hourly) == 0 {
@@ -217,8 +212,10 @@ func (m *Model) renderWeeklyPattern() string {
 	var rows []string
 
 	titleIcon := lipgloss.NewStyle().Foreground(styles.Primary).Render("📅")
-	rows = append(rows, fmt.Sprintf("%s %s", titleIcon, styles.CardTitleStyle.Render("Weekly Pattern")))
-	rows = append(rows, "")
+	rows = append(rows,
+		fmt.Sprintf("%s %s", titleIcon, styles.CardTitleStyle.Render("Weekly Pattern")),
+		"",
+	)
 
 	weekly := m.historyData.WeekdayPatterns
 	if len(weekly) == 0 {
@@ -245,11 +242,13 @@ func (m *Model) renderWeeklyPattern() string {
 
 		// Peak day info
 		peakDay, peakVal := m.historyData.GetPeakDay()
-		rows = append(rows, "")
-		rows = append(rows, fmt.Sprintf("  Peak day: %s (avg %.1f%% consumed)",
-			lipgloss.NewStyle().Bold(true).Foreground(styles.Primary).Render(peakDay),
-			peakVal,
-		))
+		rows = append(rows,
+			"",
+			fmt.Sprintf("  Peak day: %s (avg %.1f%% consumed)",
+				lipgloss.NewStyle().Bold(true).Foreground(styles.Primary).Render(peakDay),
+				peakVal,
+			),
+		)
 	}
 
 	rows = append(rows, "")

@@ -9,9 +9,9 @@ import (
 
 // LoadingSpinner wraps a bubble spinner with label support.
 type LoadingSpinner struct {
-	spinner spinner.Model
-	label   string
 	style   lipgloss.Style
+	label   string
+	spinner spinner.Model
 }
 
 // NewSpinner creates a new loading spinner with the given label.
@@ -28,24 +28,24 @@ func NewSpinner(label string) LoadingSpinner {
 }
 
 // Init initializes the spinner model.
-func (l LoadingSpinner) Init() tea.Cmd {
+func (l *LoadingSpinner) Init() tea.Cmd {
 	return l.spinner.Tick
 }
 
 // Update handles spinner tick messages.
-func (l LoadingSpinner) Update(msg tea.Msg) (LoadingSpinner, tea.Cmd) {
+func (l *LoadingSpinner) Update(msg tea.Msg) (LoadingSpinner, tea.Cmd) {
 	var cmd tea.Cmd
 	l.spinner, cmd = l.spinner.Update(msg)
-	return l, cmd
+	return *l, cmd
 }
 
 // View renders the spinner without label.
-func (l LoadingSpinner) View() string {
+func (l *LoadingSpinner) View() string {
 	return l.spinner.View()
 }
 
 // ViewWithLabel renders the spinner with its label.
-func (l LoadingSpinner) ViewWithLabel() string {
+func (l *LoadingSpinner) ViewWithLabel() string {
 	return l.spinner.View() + " " + l.style.Render(l.label)
 }
 
@@ -55,22 +55,22 @@ func (l *LoadingSpinner) SetLabel(label string) {
 }
 
 // Label returns the current label.
-func (l LoadingSpinner) Label() string {
+func (l *LoadingSpinner) Label() string {
 	return l.label
 }
 
 // Spinner returns the underlying spinner model.
-func (l LoadingSpinner) Spinner() spinner.Model {
+func (l *LoadingSpinner) Spinner() spinner.Model {
 	return l.spinner
 }
 
 // Tick returns the tick command for the spinner.
-func (l LoadingSpinner) Tick() tea.Cmd {
+func (l *LoadingSpinner) Tick() tea.Cmd {
 	return l.spinner.Tick
 }
 
 // RenderSpinnerCentered renders a spinner centered in a given width and height.
-func RenderSpinnerCentered(s LoadingSpinner, width, height int) string {
+func RenderSpinnerCentered(s *LoadingSpinner, width, height int) string {
 	content := s.ViewWithLabel()
 	return styles.CenterBoth(content, width, height)
 }

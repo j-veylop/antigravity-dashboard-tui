@@ -91,32 +91,30 @@ type KeyMap struct {
 // DefaultKeyMap returns the default keybindings.
 func DefaultKeyMap() KeyMap {
 	km := KeyMap{}
-	km = setTabKeys(km)
-	km = setActionKeys(km)
-	km = setNavigationKeys(km)
-	km = setListKeys(km)
+	setTabKeys(&km)
+	setActionKeys(&km)
+	setNavigationKeys(&km)
+	setListKeys(&km)
 	return km
 }
 
-func setTabKeys(k KeyMap) KeyMap {
+func setTabKeys(k *KeyMap) {
 	k.Tab1 = key.NewBinding(key.WithKeys("1"), key.WithHelp("1", "dashboard"))
 	k.Tab2 = key.NewBinding(key.WithKeys("2"), key.WithHelp("2", "history"))
 	k.Tab3 = key.NewBinding(key.WithKeys("3"), key.WithHelp("3", "info"))
 	k.NextTab = key.NewBinding(key.WithKeys("tab", "l", "right"), key.WithHelp("tab/→", "next tab"))
 	k.PrevTab = key.NewBinding(key.WithKeys("shift+tab", "h", "left"), key.WithHelp("shift+tab/←", "prev tab"))
-	return k
 }
 
-func setActionKeys(k KeyMap) KeyMap {
+func setActionKeys(k *KeyMap) {
 	k.Refresh = key.NewBinding(key.WithKeys("r", "ctrl+r"), key.WithHelp("r", "refresh"))
 	k.Help = key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "toggle help"))
 	k.Quit = key.NewBinding(key.WithKeys("q", "ctrl+c"), key.WithHelp("q", "quit"))
 	k.Copy = key.NewBinding(key.WithKeys("c", "ctrl+c"), key.WithHelp("c", "copy"))
 	k.Delete = key.NewBinding(key.WithKeys("d", "delete"), key.WithHelp("d", "delete"))
-	return k
 }
 
-func setNavigationKeys(k KeyMap) KeyMap {
+func setNavigationKeys(k *KeyMap) {
 	k.Up = key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("↑/k", "up"))
 	k.Down = key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("↓/j", "down"))
 	k.Left = key.NewBinding(key.WithKeys("left", "h"), key.WithHelp("←/h", "left"))
@@ -124,25 +122,23 @@ func setNavigationKeys(k KeyMap) KeyMap {
 	k.Enter = key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "select"))
 	k.Escape = key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "cancel"))
 	k.SwitchFocus = key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "switch focus"))
-	return k
 }
 
-func setListKeys(k KeyMap) KeyMap {
+func setListKeys(k *KeyMap) {
 	k.PageUp = key.NewBinding(key.WithKeys("pgup", "ctrl+u"), key.WithHelp("pgup", "page up"))
 	k.PageDown = key.NewBinding(key.WithKeys("pgdown", "ctrl+d"), key.WithHelp("pgdn", "page down"))
 	k.Home = key.NewBinding(key.WithKeys("home", "g"), key.WithHelp("home", "go to top"))
 	k.End = key.NewBinding(key.WithKeys("end", "G"), key.WithHelp("end", "go to bottom"))
 	k.Filter = key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "filter"))
-	return k
 }
 
 // ShortHelp returns key bindings for the short help view.
-func (k KeyMap) ShortHelp() []key.Binding {
+func (k *KeyMap) ShortHelp() []key.Binding {
 	return []key.Binding{k.Help, k.Refresh, k.Quit}
 }
 
 // FullHelp returns key bindings for the full help view.
-func (k KeyMap) FullHelp() [][]key.Binding {
+func (k *KeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.Tab1, k.Tab2, k.Tab3},
 		{k.NextTab, k.PrevTab},
@@ -218,31 +214,20 @@ func DefaultStyles() Styles {
 
 // Model is the main application model.
 type Model struct {
-	// Tab management
-	activeTab TabID
-	tabs      []Tab
-	tabNames  []string
-
-	// Shared state
-	state    *State
-	services *services.Manager
-	commands *Commands
-	keymap   KeyMap
-	styles   Styles
-
-	// UI components
-	spinner spinner.Model
-
-	// Window dimensions
-	width  int
-	height int
-
-	// UI state
-	showHelp bool
-	ready    bool
-
-	// Service subscription
+	styles       Styles
+	commands     *Commands
 	eventChannel chan services.ServiceEvent
+	state        *State
+	services     *services.Manager
+	keymap       KeyMap
+	tabNames     []string
+	tabs         []Tab
+	spinner      spinner.Model
+	activeTab    TabID
+	width        int
+	height       int
+	showHelp     bool
+	ready        bool
 }
 
 // NewModel initializes a new application model.
@@ -336,8 +321,10 @@ func (m *Model) Init() tea.Cmd {
 	}
 
 	if m.services != nil {
-		cmds = append(cmds, subscribeToServicesCmd(m.services))
-		cmds = append(cmds, loadInitialData(m.services))
+		cmds = append(cmds,
+			subscribeToServicesCmd(m.services),
+			loadInitialData(m.services),
+		)
 	}
 
 	for _, tab := range m.tabs {
@@ -403,27 +390,50 @@ func (m *Model) handleAppMsg(msg tea.Msg) []tea.Cmd {
 		cmds = append(cmds, m.handleSwitchAccountResult(msg)...)
 	case DeleteAccountResultMsg:
 		cmds = append(cmds, m.handleDeleteAccountResult(msg)...)
+	case ErrorMsg:
+		cmds = append(cmds, notifyErrorCmd(msg.Error.Error()))
+	case RefreshMsg:
+		cmds = append(cmds, m.handleRefresh(msg)...)
+	case AddNotificationMsg, RemoveNotificationMsg, ClearExpiredNotificationsMsg:
+		cmds = append(cmds, m.handleNotificationMsg(msg)...)
+	case StartLoadingMsg, StopLoadingMsg:
+		m.handleLoadingMsg(msg)
+	default:
+		m.handleUIMsg(msg)
+	}
+	return cmds
+}
+
+func (m *Model) handleNotificationMsg(msg tea.Msg) []tea.Cmd {
+	var cmds []tea.Cmd
+	switch msg := msg.(type) {
 	case AddNotificationMsg:
 		cmds = append(cmds, m.handleAddNotification(msg)...)
 	case RemoveNotificationMsg:
 		m.state.RemoveNotification(msg.ID)
 	case ClearExpiredNotificationsMsg:
 		m.state.ClearExpiredNotifications()
+	}
+	return cmds
+}
+
+func (m *Model) handleLoadingMsg(msg tea.Msg) {
+	switch msg := msg.(type) {
 	case StartLoadingMsg:
 		m.handleStartLoading(msg)
 	case StopLoadingMsg:
 		m.handleStopLoading(msg)
-	case ErrorMsg:
-		cmds = append(cmds, notifyErrorCmd(msg.Error.Error()))
-	case RefreshMsg:
-		cmds = append(cmds, m.handleRefresh(msg)...)
+	}
+}
+
+func (m *Model) handleUIMsg(msg tea.Msg) {
+	switch msg := msg.(type) {
 	case TabSwitchMsg:
 		m.activeTab = msg.Tab
 		m.updateTabSizes()
 	case ToggleHelpMsg:
 		m.showHelp = !m.showHelp
 	}
-	return cmds
 }
 
 func (m *Model) handleWindowSize(msg tea.WindowSizeMsg) {
@@ -702,7 +712,7 @@ func (m *Model) View() string {
 	return mainView
 }
 
-func (m *Model) overlayCentered(mainView string, overlay string) string {
+func (m *Model) overlayCentered(mainView, overlay string) string {
 	mainLines := strings.Split(mainView, "\n")
 	overlayLines := strings.Split(overlay, "\n")
 
@@ -837,28 +847,27 @@ func (m *Model) overlayToasts(mainView string, toasts []string) string {
 func (m *Model) renderHelp() string {
 	var lines []string
 
-	lines = append(lines, m.styles.Title.Render("Keyboard Shortcuts"))
-	lines = append(lines, "")
-
-	lines = append(lines, m.styles.Highlight.Render("Navigation"))
-	lines = append(lines, "  1-2        Switch tabs")
-	lines = append(lines, "  Tab/l      Next tab")
-	lines = append(lines, "  S-Tab/h    Previous tab")
-	lines = append(lines, "")
-
-	lines = append(lines, m.styles.Highlight.Render("Actions"))
-	lines = append(lines, "  r          Refresh data")
-	lines = append(lines, "  ?          Toggle help")
-	lines = append(lines, "  q/Ctrl+C   Quit")
-	lines = append(lines, "")
-
-	lines = append(lines, m.styles.Highlight.Render("Lists"))
-	lines = append(lines, "  j/k        Move up/down")
-	lines = append(lines, "  g/G        Go to top/bottom")
-	lines = append(lines, "  C-u/C-d    Page up/down")
-	lines = append(lines, "  Enter      Select item")
-	lines = append(lines, "  /          Filter")
-	lines = append(lines, "")
+	lines = append(lines,
+		m.styles.Title.Render("Keyboard Shortcuts"),
+		"",
+		m.styles.Highlight.Render("Navigation"),
+		"  1-2        Switch tabs",
+		"  Tab/l      Next tab",
+		"  S-Tab/h    Previous tab",
+		"",
+		m.styles.Highlight.Render("Actions"),
+		"  r          Refresh data",
+		"  ?          Toggle help",
+		"  q/Ctrl+C   Quit",
+		"",
+		m.styles.Highlight.Render("Lists"),
+		"  j/k        Move up/down",
+		"  g/G        Go to top/bottom",
+		"  C-u/C-d    Page up/down",
+		"  Enter      Select item",
+		"  /          Filter",
+		"",
+	)
 
 	if int(m.activeTab) < len(m.tabs) && m.tabs[m.activeTab] != nil {
 		tabHelp := m.tabs[m.activeTab].ShortHelp()
@@ -870,8 +879,7 @@ func (m *Model) renderHelp() string {
 		}
 	}
 
-	lines = append(lines, "")
-	lines = append(lines, m.styles.Subtle.Render("Press ? or Esc to close"))
+	lines = append(lines, "", m.styles.Subtle.Render("Press ? or Esc to close"))
 
 	return styles.HelpPanelStyle.Render(strings.Join(lines, "\n"))
 }

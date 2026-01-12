@@ -5,18 +5,18 @@ import "time"
 
 // APICall represents a logged API call to the database.
 type APICall struct {
-	ID               int64
 	Timestamp        time.Time
+	Error            string
 	Email            string
 	Model            string
 	Provider         string
-	InputTokens      int
+	SessionID        string
+	RequestID        string
 	OutputTokens     int
-	CacheReadTokens  int
 	CacheWriteTokens int
 	DurationMs       int
 	StatusCode       int
-	Error            string
-	RequestID        string
-	SessionID        string
+	CacheReadTokens  int
+	ID               int64
+	InputTokens      int
 }

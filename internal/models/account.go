@@ -10,19 +10,19 @@ import (
 // Account represents a Google Cloud account with OAuth credentials.
 // This is the unified account type used throughout the application.
 type Account struct {
-	ID                  string           `json:"id"`
-	Email               string           `json:"email"`
-	DisplayName         string           `json:"displayName,omitempty"`
-	Picture             string           `json:"picture,omitempty"`
-	RefreshToken        string           `json:"refreshToken"`
-	AccessToken         string           `json:"accessToken,omitempty"`
 	ExpiresAt           time.Time        `json:"expiresAt"`
+	LastUsed            time.Time        `json:"lastUsed"`
+	AddedAt             time.Time        `json:"addedAt"`
+	RateLimitResetTimes map[string]int64 `json:"rateLimitResetTimes,omitempty"`
+	Picture             string           `json:"picture,omitempty"`
+	AccessToken         string           `json:"accessToken,omitempty"`
+	RefreshToken        string           `json:"refreshToken"`
 	ProjectID           string           `json:"projectId,omitempty"`
 	ManagedProjectID    string           `json:"managedProjectId,omitempty"`
+	ID                  string           `json:"id"`
+	DisplayName         string           `json:"displayName,omitempty"`
+	Email               string           `json:"email"`
 	IsActive            bool             `json:"isActive,omitempty"`
-	AddedAt             time.Time        `json:"addedAt"`
-	LastUsed            time.Time        `json:"lastUsed"`
-	RateLimitResetTimes map[string]int64 `json:"rateLimitResetTimes,omitempty"`
 }
 
 // GetEmail returns the account email (implements interface for quota service).
@@ -62,27 +62,27 @@ func (a *Account) Clone() Account {
 
 // AccountWithQuota combines account information with its current quota status.
 type AccountWithQuota struct {
-	Account
 	QuotaInfo *QuotaInfo `json:"quotaInfo,omitempty"`
-	IsActive  bool       `json:"isActive"`
+	Account
+	IsActive bool `json:"isActive"`
 }
 
 // RawAccountData represents the JSON structure of an account in the accounts file.
 // Used for backward-compatible JSON parsing from antigravity-accounts.json.
 type RawAccountData struct {
+	RateLimitResetTimes map[string]float64 `json:"rateLimitResetTimes,omitempty"`
 	Email               string             `json:"email"`
 	RefreshToken        string             `json:"refreshToken"`
 	ProjectID           string             `json:"projectId"`
 	ManagedProjectID    string             `json:"managedProjectId,omitempty"`
 	AddedAt             json.RawMessage    `json:"addedAt,omitempty"`
 	LastUsed            json.RawMessage    `json:"lastUsed,omitempty"`
-	RateLimitResetTimes map[string]float64 `json:"rateLimitResetTimes,omitempty"`
 }
 
 // RawAccountsFile represents the top-level structure of the accounts JSON file.
 type RawAccountsFile struct {
-	Version  int              `json:"version"`
 	Accounts []RawAccountData `json:"accounts"`
+	Version  int              `json:"version"`
 }
 
 // ToAccount converts RawAccountData to Account, parsing date fields.

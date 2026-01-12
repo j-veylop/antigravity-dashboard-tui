@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/j-veylop/antigravity-dashboard-tui/internal/logger"
+
 	// Import modernc.org/sqlite as a blank import to register the driver
 	_ "modernc.org/sqlite"
 	// sqlite driver
@@ -221,7 +223,9 @@ func (db *DB) createAggregatedSnapshotsTable() error {
 // Close closes the database connection gracefully.
 func (db *DB) Close() error {
 	// Checkpoint WAL before closing
-	_, _ = db.ExecContext(context.Background(), "PRAGMA wal_checkpoint(TRUNCATE)")
+	if _, err := db.ExecContext(context.Background(), "PRAGMA wal_checkpoint(TRUNCATE)"); err != nil {
+		logger.Error("failed to checkpoint WAL", "error", err)
+	}
 	return db.DB.Close()
 }
 

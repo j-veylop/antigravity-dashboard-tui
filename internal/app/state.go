@@ -49,10 +49,10 @@ func (n NotificationType) String() string {
 
 // Notification represents a user-facing notification message.
 type Notification struct {
-	ID        string
-	Type      NotificationType
-	Message   string
 	CreatedAt time.Time
+	ID        string
+	Message   string
+	Type      NotificationType
 	Duration  time.Duration
 }
 
@@ -74,20 +74,16 @@ type LoadingState struct {
 
 // State holds the global application state.
 type State struct {
-	mu sync.RWMutex
-
-	Accounts             []models.AccountWithQuota
+	LastUpdated          time.Time
 	ActiveAccount        *models.AccountWithQuota
 	Stats                *services.StatsEvent
 	Projections          map[string]*models.AccountProjection
+	Accounts             []models.AccountWithQuota
+	notifications        []Notification
 	SelectedAccountIndex int
-
-	Loading LoadingState
-
-	LastUpdated time.Time
-
-	notifications   []Notification
-	notificationSeq int
+	notificationSeq      int
+	mu                   sync.RWMutex
+	Loading              LoadingState
 }
 
 // NewState creates a new application state.

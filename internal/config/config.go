@@ -31,7 +31,7 @@ func Load() (*Config, error) {
 	envPaths := getEnvPaths()
 	for _, path := range envPaths {
 		if _, err := os.Stat(path); err == nil {
-			_ = godotenv.Load(path)
+			_ = godotenv.Load(path) //nolint:errcheck // Logger not initialized yet
 			break
 		}
 	}

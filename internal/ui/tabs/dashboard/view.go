@@ -21,9 +21,7 @@ func (m *Model) View() string {
 
 	var sections []string
 
-	sections = append(sections, m.renderTitle())
-
-	sections = append(sections, m.renderQuotaList())
+	sections = append(sections, m.renderTitle(), m.renderQuotaList())
 
 	content := lipgloss.JoinVertical(lipgloss.Left, sections...)
 
@@ -37,7 +35,7 @@ func (m *Model) View() string {
 
 // renderLoading renders the loading state.
 func (m *Model) renderLoading() string {
-	return components.RenderSpinnerCentered(m.spinner, m.width, m.height)
+	return components.RenderSpinnerCentered(&m.spinner, m.width, m.height)
 }
 
 // renderTitle renders the dashboard title.
@@ -62,9 +60,11 @@ func (m *Model) renderQuotaList() string {
 	if len(accounts) == 0 {
 		rows = append(rows, "")
 		emptyIcon := lipgloss.NewStyle().Foreground(styles.Subtle).Render("○")
-		rows = append(rows, fmt.Sprintf("  %s %s", emptyIcon, styles.HelpStyle.Render("No accounts configured")))
-		rows = append(rows, "")
-		rows = append(rows, styles.InfoTextStyle.Render("  ╰─▶ Add accounts by editing accounts.json"))
+		rows = append(rows,
+			fmt.Sprintf("  %s %s", emptyIcon, styles.HelpStyle.Render("No accounts configured")),
+			"",
+			styles.InfoTextStyle.Render("  ╰─▶ Add accounts by editing accounts.json"),
+		)
 
 		return styles.CardStyle.Width(cardWidth).Render(
 			lipgloss.JoinVertical(lipgloss.Left, rows...),
@@ -78,13 +78,12 @@ func (m *Model) renderQuotaList() string {
 
 	rows = append(rows, "")
 
-	for i, acc := range accounts {
+	for i := range accounts {
+		acc := &accounts[i]
 		accountRow := m.renderAccountRow(acc, i == m.selectedIndex, cardWidth-4)
 		rows = append(rows, accountRow)
 		if i < len(accounts)-1 {
-			rows = append(rows, "")
-			rows = append(rows, divider)
-			rows = append(rows, "")
+			rows = append(rows, "", divider, "")
 		}
 	}
 
@@ -95,11 +94,10 @@ func (m *Model) renderQuotaList() string {
 	)
 }
 
-func (m *Model) renderAccountRow(acc models.AccountWithQuota, selected bool, width int) string {
+func (m *Model) renderAccountRow(acc *models.AccountWithQuota, selected bool, width int) string {
 	var lines []string
 
-	lines = append(lines, m.renderAccountHeader(acc, selected))
-	lines = append(lines, "")
+	lines = append(lines, m.renderAccountHeader(acc, selected), "")
 
 	// Quota bars
 	contentWidth := max(width-4, 20)
@@ -116,7 +114,7 @@ func (m *Model) renderAccountRow(acc models.AccountWithQuota, selected bool, wid
 	return lipgloss.JoinVertical(lipgloss.Left, lines...)
 }
 
-func (m *Model) renderAccountHeader(acc models.AccountWithQuota, selected bool) string {
+func (m *Model) renderAccountHeader(acc *models.AccountWithQuota, selected bool) string {
 	activeIndicator := lipgloss.NewStyle().Foreground(styles.Subtle).Render("○ ")
 	if acc.IsActive {
 		activeIndicator = styles.SuccessTextStyle.Render("● ")
@@ -151,7 +149,7 @@ func (m *Model) renderAccountHeader(acc models.AccountWithQuota, selected bool) 
 	)
 }
 
-func (m *Model) renderAccountQuotas(acc models.AccountWithQuota, width int) []string {
+func (m *Model) renderAccountQuotas(acc *models.AccountWithQuota, width int) []string {
 	var lines []string
 	proj := m.state.GetProjection(acc.Email)
 	tier := acc.QuotaInfo.SubscriptionTier
@@ -199,7 +197,8 @@ func (m *Model) calculateDisplayQuotas(
 	claudeResetSec = 0
 	geminiResetSec = 0
 
-	for _, mq := range quotaInfo.ModelQuotas {
+	for i := range quotaInfo.ModelQuotas {
+		mq := &quotaInfo.ModelQuotas[i]
 		switch mq.ModelFamily {
 		case "claude":
 			currentPercent := 0.0
@@ -252,23 +251,19 @@ func (m *Model) renderModelQuota(
 	return lines
 }
 
-func (m *Model) renderAccountError(acc models.AccountWithQuota, width int) []string {
+func (m *Model) renderAccountError(acc *models.AccountWithQuota, width int) []string {
 	var lines []string
 	tier := acc.QuotaInfo.SubscriptionTier
 
 	claudeIcon := lipgloss.NewStyle().Foreground(lipgloss.Color("#cc785c")).Render("⬡")
 	claudeLabel := lipgloss.NewStyle().Foreground(lipgloss.Color("#cc785c")).Bold(true).Render("Claude")
-	lines = append(lines, fmt.Sprintf("  %s %s", claudeIcon, claudeLabel))
 	block1 := m.renderQuotaBarWithTime(0, width, 0, tier, nil)
-	lines = append(lines, block1)
-
-	lines = append(lines, "")
+	lines = append(lines, fmt.Sprintf("  %s %s", claudeIcon, claudeLabel), block1, "")
 
 	geminiIcon := lipgloss.NewStyle().Foreground(lipgloss.Color("#4285f4")).Render("◎")
 	geminiLabel := lipgloss.NewStyle().Foreground(lipgloss.Color("#4285f4")).Bold(true).Render("Gemini")
-	lines = append(lines, fmt.Sprintf("  %s %s", geminiIcon, geminiLabel))
 	block2 := m.renderQuotaBarWithTime(0, width, 0, tier, nil)
-	lines = append(lines, block2)
+	lines = append(lines, fmt.Sprintf("  %s %s", geminiIcon, geminiLabel), block2)
 
 	return lines
 }
@@ -278,25 +273,18 @@ func (m *Model) renderAccountLoading(width int) []string {
 
 	claudeIcon := lipgloss.NewStyle().Foreground(lipgloss.Color("#cc785c")).Render("⬡")
 	claudeLabel := lipgloss.NewStyle().Foreground(lipgloss.Color("#cc785c")).Bold(true).Render("Claude")
-	lines = append(lines, fmt.Sprintf("  %s %s", claudeIcon, claudeLabel))
 	block1 := m.renderLoadingBar("claude", width)
-	lines = append(lines, block1)
-
-	lines = append(lines, "")
+	lines = append(lines, fmt.Sprintf("  %s %s", claudeIcon, claudeLabel), block1, "")
 
 	geminiIcon := lipgloss.NewStyle().Foreground(lipgloss.Color("#4285f4")).Render("◎")
 	geminiLabel := lipgloss.NewStyle().Foreground(lipgloss.Color("#4285f4")).Bold(true).Render("Gemini")
-	lines = append(lines, fmt.Sprintf("  %s %s", geminiIcon, geminiLabel))
 	block2 := m.renderLoadingBar("gemini", width)
-	lines = append(lines, block2)
-
-	lines = append(lines, "")
+	lines = append(lines, fmt.Sprintf("  %s %s", geminiIcon, geminiLabel), block2, "")
 
 	totalIcon := lipgloss.NewStyle().Foreground(styles.Primary).Render("◈")
 	totalLabel := lipgloss.NewStyle().Foreground(styles.Primary).Bold(true).Render("Total Quota Left")
-	lines = append(lines, fmt.Sprintf("  %s %s", totalIcon, totalLabel))
 	block3 := m.renderLoadingTotalBar(width)
-	lines = append(lines, block3)
+	lines = append(lines, fmt.Sprintf("  %s %s", totalIcon, totalLabel), block3)
 
 	return lines
 }

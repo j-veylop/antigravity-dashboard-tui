@@ -15,13 +15,11 @@ func (m *Model) View() string {
 	var sections []string
 
 	// Title
-	sections = append(sections, m.renderTitle())
-
-	// Configuration card
-	sections = append(sections, m.renderConfigCard())
-
-	// About card
-	sections = append(sections, m.renderAboutCard())
+	sections = append(sections,
+		m.renderTitle(),
+		m.renderConfigCard(),
+		m.renderAboutCard(),
+	)
 
 	content := lipgloss.JoinVertical(lipgloss.Left, sections...)
 
@@ -46,19 +44,25 @@ func (m *Model) renderConfigCard() string {
 	cardWidth := min(max(m.width-6, 50), 80)
 
 	var rows []string
-	rows = append(rows, styles.CardTitleStyle.Render("Configuration"))
-	rows = append(rows, "")
+	rows = append(rows,
+		styles.CardTitleStyle.Render("Configuration"),
+		"",
+	)
 
 	if m.config != nil {
-		rows = append(rows, m.renderConfigRow("Accounts File", m.config.AccountsPath))
-		rows = append(rows, m.renderConfigRow("Database", m.config.DatabasePath))
-		rows = append(rows, m.renderConfigRow("Quota Refresh", m.config.QuotaRefreshInterval.String()))
+		rows = append(rows,
+			m.renderConfigRow("Accounts File", m.config.AccountsPath),
+			m.renderConfigRow("Database", m.config.DatabasePath),
+			m.renderConfigRow("Quota Refresh", m.config.QuotaRefreshInterval.String()),
+		)
 	} else {
 		rows = append(rows, styles.HelpStyle.Render("Configuration not loaded"))
 	}
 
-	rows = append(rows, "")
-	rows = append(rows, styles.HelpStyle.Render("Press 'c' to copy paths"))
+	rows = append(rows,
+		"",
+		styles.HelpStyle.Render("Press 'c' to copy paths"),
+	)
 
 	return styles.CardStyle.Width(cardWidth).Render(
 		lipgloss.JoinVertical(lipgloss.Left, rows...),
@@ -82,15 +86,16 @@ func (m *Model) renderAboutCard() string {
 	cardWidth := min(max(m.width-6, 50), 80)
 
 	var rows []string
-	rows = append(rows, styles.CardTitleStyle.Render("About Antigravity Dashboard TUI"))
-	rows = append(rows, "")
-
-	rows = append(rows, m.renderConfigRow("Version", version.GetVersion()))
-	rows = append(rows, m.renderConfigRow("Build Date", version.GetDate()))
-	rows = append(rows, m.renderConfigRow("Git Commit", version.GetCommit()))
-	rows = append(rows, m.renderConfigRow("Go Version", runtime.Version()))
-	rows = append(rows, m.renderConfigRow("Platform", fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)))
-	rows = append(rows, "")
+	rows = append(rows,
+		styles.CardTitleStyle.Render("About Antigravity Dashboard TUI"),
+		"",
+		m.renderConfigRow("Version", version.GetVersion()),
+		m.renderConfigRow("Build Date", version.GetDate()),
+		m.renderConfigRow("Git Commit", version.GetCommit()),
+		m.renderConfigRow("Go Version", runtime.Version()),
+		m.renderConfigRow("Platform", fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)),
+		"",
+	)
 
 	accountCount := m.state.GetAccountCount()
 	rows = append(rows, fmt.Sprintf("Accounts: %s", styles.InfoTextStyle.Render(fmt.Sprintf("%d", accountCount))))

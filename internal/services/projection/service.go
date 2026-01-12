@@ -24,18 +24,17 @@ const (
 
 // Service handles projection calculations.
 type Service struct {
-	mu sync.RWMutex
-	db *db.DB
-
+	db              *db.DB
 	lastQuotas      map[string]*quotaState
 	sessionIDs      map[string]string
 	projectionCache map[string]*models.AccountProjection
+	mu              sync.RWMutex
 }
 
 type quotaState struct {
+	timestamp     time.Time
 	claudePercent float64
 	geminiPercent float64
-	timestamp     time.Time
 }
 
 // New creates a new projection service.

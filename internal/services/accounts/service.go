@@ -18,16 +18,16 @@ import (
 
 // File represents the JSON file structure for accounts storage.
 type File struct {
-	Accounts      []models.Account `json:"accounts"`
 	ActiveAccount string           `json:"activeAccount,omitempty"`
+	Accounts      []models.Account `json:"accounts"`
 	Version       int              `json:"version,omitempty"`
 }
 
 // Event represents an account service event.
 type Event struct {
-	Type    EventType
 	Error   error
 	Account *models.Account
+	Type    EventType
 }
 
 // EventType defines the type of account event.
@@ -52,15 +52,15 @@ const (
 
 // Service manages accounts with file watching and change notifications.
 type Service struct {
-	mu            sync.RWMutex
-	accounts      []models.Account
-	activeAccount string
-	filePath      string
 	watcher       *fsnotify.Watcher
 	onChange      func()
 	eventChan     chan Event
 	stopChan      chan struct{}
 	debounceTimer *time.Timer
+	activeAccount string
+	filePath      string
+	accounts      []models.Account
+	mu            sync.RWMutex
 }
 
 // defaultAccountsPath returns the default accounts file path.
@@ -95,8 +95,8 @@ func New(filePath string) (*Service, error) {
 	if err := s.loadAccounts(); err != nil {
 		// If file doesn't exist, create empty accounts file
 		if os.IsNotExist(err) {
-			if err := s.saveAccounts(); err != nil {
-				return nil, fmt.Errorf("failed to create accounts file: %w", err)
+			if createErr := s.saveAccounts(); createErr != nil {
+				return nil, fmt.Errorf("failed to create accounts file: %w", createErr)
 			}
 		} else {
 			return nil, fmt.Errorf("failed to load accounts: %w", err)
@@ -124,7 +124,8 @@ func (s *Service) GetAccounts() []models.Account {
 	defer s.mu.RUnlock()
 
 	accounts := make([]models.Account, len(s.accounts))
-	for i, acc := range s.accounts {
+	for i := range s.accounts {
+		acc := s.accounts[i]
 		accounts[i] = acc
 
 		if acc.RateLimitResetTimes != nil {
@@ -170,7 +171,8 @@ func (s *Service) SetActiveAccount(idOrEmail string) error {
 
 	// Verify account exists
 	found := false
-	for _, acc := range s.accounts {
+	for i := range s.accounts {
+		acc := &s.accounts[i]
 		if acc.ID == idOrEmail || acc.Email == idOrEmail {
 			found = true
 			s.activeAccount = acc.ID
@@ -199,7 +201,8 @@ func (s *Service) AddAccount(account models.Account) error {
 	defer s.mu.Unlock()
 
 	// Check for duplicate
-	for _, acc := range s.accounts {
+	for i := range s.accounts {
+		acc := &s.accounts[i]
 		if acc.Email == account.Email {
 			return fmt.Errorf("account with email %s already exists", account.Email)
 		}
@@ -236,20 +239,22 @@ func (s *Service) UpdateAccount(account models.Account) error {
 	defer s.mu.Unlock()
 
 	found := false
-	for i, acc := range s.accounts {
-		if acc.ID == account.ID || acc.Email == account.Email {
-			// Preserve ID if updating by email
-			if account.ID == "" {
-				account.ID = acc.ID
-			}
-			// Preserve AddedAt
-			if account.AddedAt.IsZero() {
-				account.AddedAt = acc.AddedAt
-			}
-			s.accounts[i] = account
-			found = true
-			break
+	for i := range s.accounts {
+		acc := &s.accounts[i]
+		if acc.ID != account.ID && acc.Email != account.Email {
+			continue
 		}
+		// Preserve ID if updating by email
+		if account.ID == "" {
+			account.ID = acc.ID
+		}
+		// Preserve AddedAt
+		if account.AddedAt.IsZero() {
+			account.AddedAt = acc.AddedAt
+		}
+		s.accounts[i] = account
+		found = true
+		break
 	}
 
 	if !found {
@@ -271,7 +276,8 @@ func (s *Service) DeleteAccount(idOrEmail string) error {
 
 	idx := -1
 	var deleted models.Account
-	for i, acc := range s.accounts {
+	for i := range s.accounts {
+		acc := s.accounts[i]
 		if acc.ID == idOrEmail || acc.Email == idOrEmail {
 			idx = i
 			deleted = acc
@@ -387,8 +393,8 @@ func (s *Service) getDefaultActiveAccount(accounts []models.Account) string {
 
 func (s *Service) parseJSDashboardFormat(data []byte) ([]models.Account, string, error) {
 	var rawFile struct {
-		Version     int                     `json:"version"`
 		Accounts    []models.RawAccountData `json:"accounts"`
+		Version     int                     `json:"version"`
 		ActiveIndex int                     `json:"activeIndex"`
 	}
 
@@ -437,7 +443,8 @@ func (s *Service) parseStandardFormat(data []byte) ([]models.Account, string, er
 	activeAccount := accountsFile.ActiveAccount
 	if activeAccount != "" {
 		found := false
-		for _, acc := range accountsFile.Accounts {
+		for i := range accountsFile.Accounts {
+			acc := &accountsFile.Accounts[i]
 			if acc.ID == activeAccount || acc.Email == activeAccount {
 				found = true
 				break

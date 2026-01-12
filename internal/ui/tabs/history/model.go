@@ -66,19 +66,17 @@ type historyErrorMsg struct {
 
 // Model represents the history tab state.
 type Model struct {
-	state    *app.State
-	services *services.Manager
-	width    int
-	height   int
-	keys     keyMap
-	viewport viewport.Model
-
-	// Current view state
-	timeRange   models.TimeRange
-	historyData *models.AccountHistoryStats
-	loading     bool
 	lastRefresh time.Time
+	state       *app.State
+	services    *services.Manager
+	historyData *models.AccountHistoryStats
 	errorMsg    string
+	keys        keyMap
+	viewport    viewport.Model
+	width       int
+	height      int
+	timeRange   models.TimeRange
+	loading     bool
 }
 
 // New creates a new history model.
@@ -118,7 +116,8 @@ func (m *Model) loadHistoryCmd() tea.Cmd {
 			email = accounts[selectedIdx].Email
 		} else {
 			// Fallback to active account
-			for _, acc := range accounts {
+			for i := range accounts {
+				acc := &accounts[i]
 				if acc.IsActive {
 					email = acc.Email
 					break

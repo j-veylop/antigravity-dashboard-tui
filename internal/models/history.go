@@ -64,15 +64,15 @@ type RateLimitHit struct {
 
 // RateLimitStats aggregates rate limit transition counts.
 type RateLimitStats struct {
-	TotalHits      int           // All-time transition count
-	HitsInRange    int           // Hits within selected time range
-	HitsLast7Days  int           // Last 7 days
-	HitsLast30Days int           // Last 30 days
-	LastHitTime    time.Time     // Most recent rate limit
-	AvgTimeBetween time.Duration // Average time between rate limit events
+	LastHitTime    time.Time
 	HitsByDay      []DailyHitCount
-	ClaudeHits     int // Claude-specific hits
-	GeminiHits     int // Gemini-specific hits
+	TotalHits      int
+	HitsInRange    int
+	HitsLast7Days  int
+	HitsLast30Days int
+	AvgTimeBetween time.Duration
+	ClaudeHits     int
+	GeminiHits     int
 }
 
 // DailyHitCount tracks rate limit hits per day.
@@ -83,15 +83,15 @@ type DailyHitCount struct {
 
 // SessionExhaustionEvent represents one session's exhaustion data.
 type SessionExhaustionEvent struct {
-	SessionID    string
-	Email        string
 	StartTime    time.Time
 	EndTime      time.Time
-	StartPercent float64       // Quota % at session start (100 - consumed)
-	EndPercent   float64       // Quota % at session end
-	Duration     time.Duration // Session duration
-	WasExhausted bool          // True if reached near 0%
-	Model        string        // "claude", "gemini", or "combined"
+	SessionID    string
+	Email        string
+	Model        string
+	StartPercent float64
+	EndPercent   float64
+	Duration     time.Duration
+	WasExhausted bool
 }
 
 // ExhaustionStats aggregates time-to-exhaustion data.
@@ -128,28 +128,28 @@ type HourlyPattern struct {
 
 // WeekdayPattern represents usage patterns by day of week.
 type WeekdayPattern struct {
-	DayOfWeek   int     // 0=Sunday, 6=Saturday
-	DayName     string  // "Sunday", "Monday", etc.
-	AvgConsumed float64 // Average daily consumption
-	TotalHits   int     // Total rate limit hits on this day
-	Occurrences int     // How many times this day was observed
+	DayName     string
+	DayOfWeek   int
+	AvgConsumed float64
+	TotalHits   int
+	Occurrences int
 }
 
 // AccountHistoryStats contains all history data for a single account.
 type AccountHistoryStats struct {
-	Email           string
-	TimeRange       TimeRange
-	RateLimits      *RateLimitStats
-	Exhaustion      *ExhaustionStats
-	DailyUsage      []DailyUsagePoint
-	HourlyPatterns  []HourlyPattern  // 24 entries, one per hour
-	WeekdayPatterns []WeekdayPattern // 7 entries, one per day
-	Historical      *HistoricalContext
 	FirstDataPoint  time.Time
+	LastUpdated     time.Time
 	LastDataPoint   time.Time
+	Exhaustion      *ExhaustionStats
+	Historical      *HistoricalContext
+	RateLimits      *RateLimitStats
+	Email           string
+	DailyUsage      []DailyUsagePoint
+	HourlyPatterns  []HourlyPattern
+	WeekdayPatterns []WeekdayPattern
 	TotalDataDays   int
 	TotalDataPoints int
-	LastUpdated     time.Time
+	TimeRange       TimeRange
 }
 
 // HasData returns true if the account has any historical data.
@@ -158,12 +158,12 @@ func (a *AccountHistoryStats) HasData() bool {
 }
 
 // GetPeakHour returns the hour with highest average consumption.
-func (a *AccountHistoryStats) GetPeakHour() (int, float64) {
+func (a *AccountHistoryStats) GetPeakHour() (peakHour int, peakVal float64) {
 	if len(a.HourlyPatterns) == 0 {
 		return 0, 0
 	}
-	peakHour := 0
-	peakVal := 0.0
+	peakHour = 0
+	peakVal = 0.0
 	for _, p := range a.HourlyPatterns {
 		if p.AvgConsumed > peakVal {
 			peakVal = p.AvgConsumed
@@ -174,12 +174,12 @@ func (a *AccountHistoryStats) GetPeakHour() (int, float64) {
 }
 
 // GetPeakDay returns the weekday with highest average consumption.
-func (a *AccountHistoryStats) GetPeakDay() (string, float64) {
+func (a *AccountHistoryStats) GetPeakDay() (peakDay string, peakVal float64) {
 	if len(a.WeekdayPatterns) == 0 {
 		return "Unknown", 0
 	}
-	peakDay := ""
-	peakVal := 0.0
+	peakDay = ""
+	peakVal = 0.0
 	for _, p := range a.WeekdayPatterns {
 		if p.AvgConsumed > peakVal {
 			peakVal = p.AvgConsumed

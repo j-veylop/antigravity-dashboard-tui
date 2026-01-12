@@ -498,10 +498,7 @@ func (db *DB) querySessionStats(email string, days int) (*sql.Rows, error) {
 	return rows, nil
 }
 
-func (db *DB) processSessionRows(rows *sql.Rows, stats *models.ExhaustionStats) ([]time.Duration, []float64) {
-	var exhaustedDurations []time.Duration
-	var startPercents []float64
-
+func (db *DB) processSessionRows(rows *sql.Rows, stats *models.ExhaustionStats) (exhaustedDurations []time.Duration, startPercents []float64) {
 	for rows.Next() {
 		var sessionID string
 		var startTimeStr, endTimeStr sql.NullString
@@ -805,7 +802,10 @@ func (db *DB) GetAccountHistoryStats(email string, timeRange models.TimeRange) (
 	stats.Historical = historical
 
 	// Get first/last data points
-	firstTime, _ := db.GetFirstSnapshotTime(email)
+	firstTime, err := db.GetFirstSnapshotTime(email)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get first snapshot time: %w", err)
+	}
 	stats.FirstDataPoint = firstTime
 	if len(dailyUsage) > 0 {
 		stats.LastDataPoint = dailyUsage[len(dailyUsage)-1].Date

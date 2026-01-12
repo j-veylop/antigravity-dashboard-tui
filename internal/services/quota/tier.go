@@ -59,7 +59,8 @@ func GetTierFromQuotas(quotas []models.ModelQuota) SubscriptionTier {
 	hasFree := false
 	hasValid := false
 
-	for _, q := range quotas {
+	for i := range quotas {
+		q := &quotas[i]
 		tier := SubscriptionTier(q.SubscriptionTier)
 		if tier == TierUnknown || q.SubscriptionTier == "" {
 			continue

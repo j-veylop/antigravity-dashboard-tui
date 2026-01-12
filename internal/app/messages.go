@@ -41,9 +41,9 @@ type AccountsLoadedMsg struct {
 
 // QuotaRefreshedMsg contains refreshed quota data for an account.
 type QuotaRefreshedMsg struct {
-	Email     string
-	QuotaInfo *models.QuotaInfo
 	Error     error
+	QuotaInfo *models.QuotaInfo
+	Email     string
 }
 
 // StatsLoadedMsg contains loaded statistics.
@@ -58,9 +58,9 @@ type SwitchAccountMsg struct {
 
 // SwitchAccountResultMsg contains the result of an account switch.
 type SwitchAccountResultMsg struct {
+	Error   error
 	Email   string
 	Success bool
-	Error   error
 }
 
 // DeleteAccountMsg requests deletion of an account.
@@ -70,9 +70,9 @@ type DeleteAccountMsg struct {
 
 // DeleteAccountResultMsg contains the result of an account deletion.
 type DeleteAccountResultMsg struct {
+	Error   error
 	Email   string
 	Success bool
-	Error   error
 }
 
 // RefreshMsg requests a refresh of data.
@@ -87,8 +87,8 @@ type RefreshQuotaForAccountMsg struct {
 
 // AddNotificationMsg requests adding a new notification.
 type AddNotificationMsg struct {
-	Type     NotificationType
 	Message  string
+	Type     NotificationType
 	Duration time.Duration
 }
 
@@ -122,8 +122,8 @@ type QuotaUpdatedEventMsg struct {
 
 // ProjectionUpdatedMsg is a message indicating a projection update.
 type ProjectionUpdatedMsg struct {
-	Email      string
 	Projection *models.AccountProjection
+	Email      string
 }
 
 // ErrorEventMsg wraps an error event from services.
@@ -164,8 +164,8 @@ type CopyToClipboardMsg struct {
 
 // ClipboardResultMsg contains the result of a clipboard operation.
 type ClipboardResultMsg struct {
-	Success bool
 	Error   error
+	Success bool
 }
 
 // OpenURLMsg requests opening a URL in the browser.
@@ -175,9 +175,9 @@ type OpenURLMsg struct {
 
 // OpenURLResultMsg contains the result of opening a URL.
 type OpenURLResultMsg struct {
+	Error   error
 	URL     string
 	Success bool
-	Error   error
 }
 
 // ScrollUpMsg requests scrolling up.
@@ -221,15 +221,15 @@ type ExportMsg struct {
 
 // ExportResultMsg contains the result of an export operation.
 type ExportResultMsg struct {
+	Error   error
 	Path    string
 	Success bool
-	Error   error
 }
 
 // SettingsChangedMsg signals that settings have changed.
 type SettingsChangedMsg struct {
-	Key   string
 	Value any
+	Key   string
 }
 
 // ThemeChangedMsg signals that the theme has changed.
@@ -247,8 +247,8 @@ type ClearExpiredNotificationsMsg struct{}
 
 // DelayedMsg wraps a message to be sent after a delay.
 type DelayedMsg struct {
-	Delay time.Duration
 	Msg   tea.Msg
+	Delay time.Duration
 }
 
 // BatchMsg contains multiple messages to be processed.
@@ -258,6 +258,6 @@ type BatchMsg struct {
 
 // SelectedAccountChangedMsg signals that the selected account in the UI has changed.
 type SelectedAccountChangedMsg struct {
-	Index int
 	Email string
+	Index int
 }

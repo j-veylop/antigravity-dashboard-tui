@@ -54,10 +54,10 @@ func defaultKeyMap() keyMap {
 type Model struct {
 	state    *app.State
 	config   *config.Config
-	width    int
-	height   int
 	keys     keyMap
 	viewport viewport.Model
+	width    int
+	height   int
 }
 
 // New creates a new info model.

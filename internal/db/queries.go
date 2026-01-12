@@ -150,7 +150,11 @@ func (db *DB) GetHourlyStats(hours int) ([]models.HourlyStats, error) {
 			return nil, fmt.Errorf("failed to scan hourly stats: %w", err)
 		}
 
-		s.Hour, _ = time.Parse("2006-01-02 15:04:05", hourStr)
+		var parseErr error
+		s.Hour, parseErr = time.Parse("2006-01-02 15:04:05", hourStr)
+		if parseErr != nil {
+			logger.Error("failed to parse hour string", "string", hourStr, "error", parseErr)
+		}
 		stats = append(stats, s)
 	}
 

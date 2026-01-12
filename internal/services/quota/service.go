@@ -19,10 +19,10 @@ type AccountProvider interface {
 
 // Event represents a quota service event.
 type Event struct {
-	Type         EventType
-	AccountEmail string
-	QuotaInfo    *models.QuotaInfo
 	Error        error
+	QuotaInfo    *models.QuotaInfo
+	AccountEmail string
+	Type         EventType
 }
 
 // EventType defines the type of quota event.
@@ -43,11 +43,11 @@ const (
 
 // Config holds configuration for the quota service.
 type Config struct {
+	ClientID        string
+	ClientSecret    string
 	PollInterval    time.Duration
 	RefreshInterval time.Duration
 	MaxConcurrent   int
-	ClientID        string
-	ClientSecret    string
 }
 
 // DefaultConfig returns the default configuration.
@@ -61,15 +61,15 @@ func DefaultConfig() Config {
 
 // Service manages quota fetching and caching.
 type Service struct {
-	mu              sync.RWMutex
 	accountProvider AccountProvider
-	quotaCache      map[string]*models.QuotaInfo // keyed by email
-	tokenCache      map[string]*CachedToken      // keyed by email
+	quotaCache      map[string]*models.QuotaInfo
+	tokenCache      map[string]*CachedToken
 	eventChan       chan Event
 	stopChan        chan struct{}
-	config          Config
 	pollTicker      *time.Ticker
 	refreshSem      chan struct{}
+	config          Config
+	mu              sync.RWMutex
 }
 
 // New creates a new quota service.
@@ -234,7 +234,8 @@ func (s *Service) processQuotaResponse(email string, quotaResp *Response) (*mode
 	}
 
 	// Calculate aggregates
-	for _, mq := range quotaResp.ModelQuotas {
+	for i := range quotaResp.ModelQuotas {
+		mq := &quotaResp.ModelQuotas[i]
 		quotaInfo.TotalRemaining += mq.Remaining
 		quotaInfo.TotalLimit += mq.Limit
 	}
@@ -275,7 +276,8 @@ func (s *Service) RefreshAllQuotas() {
 	accounts := s.accountProvider.GetAccounts()
 	var wg sync.WaitGroup
 
-	for _, acc := range accounts {
+	for i := range accounts {
+		acc := &accounts[i]
 		wg.Add(1)
 		go func(email string) {
 			defer wg.Done()

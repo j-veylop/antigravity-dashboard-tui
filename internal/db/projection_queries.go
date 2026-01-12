@@ -89,7 +89,7 @@ func (db *DB) GetSessionSnapshots(email string, sessionWindow time.Duration) ([]
 }
 
 // GetConsumptionRates calculates consumption rates for a session.
-func (db *DB) GetConsumptionRates(email string, sessionID string) (*models.ConsumptionRates, error) {
+func (db *DB) GetConsumptionRates(email, sessionID string) (*models.ConsumptionRates, error) {
 	rates := &models.ConsumptionRates{Email: email}
 
 	sessionQuery := `

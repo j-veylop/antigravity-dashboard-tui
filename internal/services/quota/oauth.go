@@ -40,17 +40,17 @@ const (
 // TokenResponse represents the OAuth token response from Google.
 type TokenResponse struct {
 	AccessToken  string `json:"access_token"`
-	ExpiresIn    int    `json:"expires_in"`
 	RefreshToken string `json:"refresh_token,omitempty"`
 	Scope        string `json:"scope,omitempty"`
 	TokenType    string `json:"token_type"`
 	IDToken      string `json:"id_token,omitempty"`
+	ExpiresIn    int    `json:"expires_in"`
 }
 
 // CachedToken represents a cached access token with expiration.
 type CachedToken struct {
-	AccessToken string
 	ExpiresAt   time.Time
+	AccessToken string
 }
 
 // IsValid checks if the cached token is still valid.
@@ -86,8 +86,8 @@ func RefreshAccessToken(refreshToken, clientID, clientSecret string) (*TokenResp
 		return nil, fmt.Errorf("token request failed: %w", err)
 	}
 	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			logger.Error("failed to close response body", "error", err)
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			logger.Error("failed to close response body", "error", closeErr)
 		}
 	}()
 
@@ -119,8 +119,8 @@ type fetchModelsResponse struct {
 	Models map[string]struct {
 		DisplayName string `json:"displayName"`
 		QuotaInfo   struct {
-			RemainingFraction float64 `json:"remainingFraction"`
 			ResetTime         string  `json:"resetTime"`
+			RemainingFraction float64 `json:"remainingFraction"`
 		} `json:"quotaInfo"`
 	} `json:"models"`
 }
@@ -169,8 +169,8 @@ func FetchQuota(accessToken string) (*Response, error) {
 }
 
 func makeQuotaRequest(endpoint, accessToken string) ([]byte, error) {
-	url := endpoint + "/v1internal:fetchAvailableModels"
-	req, err := http.NewRequestWithContext(context.Background(), "POST", url, strings.NewReader("{}"))
+	requestURL := endpoint + "/v1internal:fetchAvailableModels"
+	req, err := http.NewRequestWithContext(context.Background(), "POST", requestURL, strings.NewReader("{}"))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create quota request: %w", err)
 	}
@@ -187,8 +187,8 @@ func makeQuotaRequest(endpoint, accessToken string) ([]byte, error) {
 		return nil, fmt.Errorf("quota request failed: %w", err)
 	}
 	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			logger.Error("failed to close response body", "error", err)
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			logger.Error("failed to close response body", "error", closeErr)
 		}
 	}()
 
@@ -221,7 +221,11 @@ func parseQuotaResponse(body []byte) ([]models.ModelQuota, error) {
 		resetTimeStr := data.QuotaInfo.ResetTime
 		var resetTime time.Time
 		if resetTimeStr != "" {
-			resetTime, _ = time.Parse(time.RFC3339, resetTimeStr)
+			var parseErr error
+			resetTime, parseErr = time.Parse(time.RFC3339, resetTimeStr)
+			if parseErr != nil {
+				logger.Error("failed to parse reset time", "time", resetTimeStr, "error", parseErr)
+			}
 		}
 
 		remainingFraction := data.QuotaInfo.RemainingFraction
@@ -257,12 +261,12 @@ func parseQuotaResponse(body []byte) ([]models.ModelQuota, error) {
 type UserInfo struct {
 	ID            string `json:"id"`
 	Email         string `json:"email"`
-	VerifiedEmail bool   `json:"verified_email"`
 	Name          string `json:"name"`
 	GivenName     string `json:"given_name"`
 	FamilyName    string `json:"family_name"`
 	Picture       string `json:"picture"`
 	Locale        string `json:"locale"`
+	VerifiedEmail bool   `json:"verified_email"`
 }
 
 // FetchUserInfo retrieves user information from Google.
@@ -272,7 +276,7 @@ func FetchUserInfo(accessToken string) (*UserInfo, error) {
 		return nil, fmt.Errorf("access token is empty")
 	}
 
-	req, err := http.NewRequestWithContext(context.Background(), "GET", userInfoEndpoint, nil)
+	req, err := http.NewRequestWithContext(context.Background(), "GET", userInfoEndpoint, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create userinfo request: %w", err)
 	}
@@ -285,8 +289,8 @@ func FetchUserInfo(accessToken string) (*UserInfo, error) {
 		return nil, fmt.Errorf("userinfo request failed: %w", err)
 	}
 	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			logger.Error("failed to close response body", "error", err)
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			logger.Error("failed to close response body", "error", closeErr)
 		}
 	}()
 

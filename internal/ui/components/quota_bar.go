@@ -24,13 +24,13 @@ func animationTick() tea.Cmd {
 
 // QuotaBar renders a quota progress bar with label and percentage.
 type QuotaBar struct {
-	progress       progress.Model
 	label          string
+	progress       progress.Model
 	percent        float64
 	animationFrame int
-	isAnimating    bool
 	targetPercent  float64
 	currentPercent float64
+	isAnimating    bool
 }
 
 // NewQuotaBar creates a new quota bar with gradient colors.
@@ -72,12 +72,12 @@ func NewQuotaBarWithWidth(width int) QuotaBar {
 }
 
 // Init initializes the model.
-func (q QuotaBar) Init() tea.Cmd {
+func (q *QuotaBar) Init() tea.Cmd {
 	return nil
 }
 
 // Update handles messages.
-func (q QuotaBar) Update(msg tea.Msg) (QuotaBar, tea.Cmd) {
+func (q *QuotaBar) Update(msg tea.Msg) (QuotaBar, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	if _, ok := msg.(AnimationTickMsg); ok {
@@ -113,10 +113,12 @@ func (q QuotaBar) Update(msg tea.Msg) (QuotaBar, tea.Cmd) {
 
 	var cmd tea.Cmd
 	model, cmd := q.progress.Update(msg)
-	q.progress = model.(progress.Model)
+	if p, ok := model.(progress.Model); ok {
+		q.progress = p
+	}
 	cmds = append(cmds, cmd)
 
-	return q, tea.Batch(cmds...)
+	return *q, tea.Batch(cmds...)
 }
 
 // SetPercent sets the percentage.
@@ -147,7 +149,7 @@ func (q *QuotaBar) SetWidth(width int) {
 }
 
 // View returns the string representation.
-func (q QuotaBar) View(percent float64, label string, width int) string {
+func (q *QuotaBar) View(percent float64, label string, width int) string {
 	barWidth := width - 30
 	if barWidth < 10 {
 		barWidth = 10
@@ -172,7 +174,7 @@ func (q QuotaBar) View(percent float64, label string, width int) string {
 }
 
 // ViewCompact renders a compact version.
-func (q QuotaBar) ViewCompact(percent float64, width int) string {
+func (q *QuotaBar) ViewCompact(percent float64, width int) string {
 	barWidth := width - 8
 	if barWidth < 5 {
 		barWidth = 5
@@ -187,7 +189,7 @@ func (q QuotaBar) ViewCompact(percent float64, width int) string {
 }
 
 // ViewRateLimited renders a rate-limited state.
-func (q QuotaBar) ViewRateLimited(label string, width int) string {
+func (q *QuotaBar) ViewRateLimited(label string, width int) string {
 	labelStyle := styles.ProgressLabelStyle
 	labelStr := labelStyle.Width(15).Render(label)
 
@@ -263,7 +265,7 @@ func RenderTimeBarChars(percent float64, width int) string {
 }
 
 // ViewWithLabel renders the time bar with label padding to align with quota bars.
-func (t TimeBar) ViewWithLabel(secondsRemaining int64, label string, width int, tier string) string {
+func (t *TimeBar) ViewWithLabel(secondsRemaining int64, label string, width int, tier string) string {
 	const hourInSeconds int64 = 3600
 	const dayInSeconds int64 = 86400
 	const proPeriodSeconds int64 = 5 * 3600
@@ -313,7 +315,7 @@ func (t TimeBar) ViewWithLabel(secondsRemaining int64, label string, width int, 
 }
 
 // ViewFromSecondsWithLabel renders a time bar from seconds remaining with label alignment.
-func (t TimeBar) ViewFromSecondsWithLabel(secondsRemaining int64, label string, width int, tier string) string {
+func (t *TimeBar) ViewFromSecondsWithLabel(secondsRemaining int64, label string, width int, tier string) string {
 	return t.ViewWithLabel(secondsRemaining, label, width, tier)
 }
 
@@ -393,7 +395,7 @@ func hexToRGB(hex string) [3]int {
 }
 
 // SimpleQuotaBarLoading renders a loading state for the quota bar.
-func SimpleQuotaBarLoading(label string, width int, frame int) string {
+func SimpleQuotaBarLoading(label string, width, frame int) string {
 	const (
 		indentWidth  = 4
 		percentWidth = 6
@@ -443,7 +445,7 @@ func SimpleQuotaBarLoading(label string, width int, frame int) string {
 }
 
 // SimpleTimeBarLoading renders a loading state for the time bar.
-func SimpleTimeBarLoading(label string, width int, frame int) string {
+func SimpleTimeBarLoading(label string, width, frame int) string {
 	const (
 		indentWidth  = 4
 		percentWidth = 6
@@ -494,7 +496,7 @@ func SimpleTimeBarLoading(label string, width int, frame int) string {
 	)
 }
 
-func renderShimmerBar(width int, frame, cycle int, accentColor lipgloss.Color, reverse bool) string {
+func renderShimmerBar(width, frame, cycle int, accentColor lipgloss.Color, reverse bool) string {
 	t := float64(frame%cycle) / float64(cycle)
 	var p float64
 	if t < 0.5 {

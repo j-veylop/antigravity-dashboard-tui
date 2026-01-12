@@ -1,4 +1,4 @@
-VERSION := $(shell cat VERSION)
+VERSION := $(shell git describe --tags --always --dirty)
 COMMIT := $(shell git describe --always --dirty)
 DATE := $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 
@@ -6,7 +6,7 @@ LDFLAGS := -X github.com/j-veylop/antigravity-dashboard-tui/internal/version.Ver
            -X github.com/j-veylop/antigravity-dashboard-tui/internal/version.Commit=$(COMMIT) \
            -X github.com/j-veylop/antigravity-dashboard-tui/internal/version.Date=$(DATE)
 
-.PHONY: all build run clean test lint fmt coverage check tools help release
+.PHONY: all build run clean test lint lint-go lint-md fmt coverage check tools help release release-major release-minor release-patch
 
 all: lint test build
 
@@ -36,11 +36,21 @@ coverage:
 	@go tool cover -func=coverage.out | grep total | awk '{print "Total coverage: " $$3}'
 	@echo "Coverage report: coverage.html"
 
-lint:
+lint: lint-go lint-md
+
+lint-go:
 	golangci-lint run
 
-lint-fix:
+lint-md:
+	npx -y markdownlint-cli '**/*.md' --ignore node_modules
+
+lint-fix: lint-go-fix lint-md-fix
+
+lint-go-fix:
 	golangci-lint run --fix
+
+lint-md-fix:
+	npx -y markdownlint-cli '**/*.md' --ignore node_modules --fix
 
 fmt:
 	go fmt ./...
@@ -63,10 +73,49 @@ help:
 	@echo "  make run        - Build and run the application"
 	@echo "  make test       - Run tests"
 	@echo "  make coverage   - Generate test coverage report"
-	@echo "  make lint       - Run linter"
-	@echo "  make lint-fix   - Run linter with auto-fix"
+	@echo "  make lint       - Run all linters"
+	@echo "  make lint-go    - Run Go linter"
+	@echo "  make lint-md    - Run Markdown linter"
+	@echo "  make lint-fix   - Run all linters with auto-fix"
+	@echo "  make lint-go-fix - Run Go linter with auto-fix"
+	@echo "  make lint-md-fix - Run Markdown linter with auto-fix"
 	@echo "  make fmt        - Format code"
 	@echo "  make check      - Run fmt + lint + test"
 	@echo "  make tools      - Install development tools"
 	@echo "  make clean      - Remove build artifacts"
 	@echo "  make all        - Run lint + test + build"
+	@echo "  make release-major - Create and push a new major release tag"
+	@echo "  make release-minor - Create and push a new minor release tag"
+	@echo "  make release-patch - Create and push a new patch release tag"
+
+CURRENT_TAG := $(shell git describe --tags --abbrev=0 2>/dev/null || echo v0.0.0)
+
+release-patch:
+	@echo "Current version: $(CURRENT_TAG)"
+	@VERSION=$$(echo $(CURRENT_TAG) | sed 's/^v//'); \
+	IFS='.' read -r major minor patch <<< "$$VERSION"; \
+	new_patch=$$((patch + 1)); \
+	NEW_TAG="v$$major.$$minor.$$new_patch"; \
+	echo "Creating release $$NEW_TAG..."; \
+	git tag -a $$NEW_TAG -m "Release $$NEW_TAG" && \
+	git push origin $$NEW_TAG
+
+release-minor:
+	@echo "Current version: $(CURRENT_TAG)"
+	@VERSION=$$(echo $(CURRENT_TAG) | sed 's/^v//'); \
+	IFS='.' read -r major minor patch <<< "$$VERSION"; \
+	new_minor=$$((minor + 1)); \
+	NEW_TAG="v$$major.$$new_minor.0"; \
+	echo "Creating release $$NEW_TAG..."; \
+	git tag -a $$NEW_TAG -m "Release $$NEW_TAG" && \
+	git push origin $$NEW_TAG
+
+release-major:
+	@echo "Current version: $(CURRENT_TAG)"
+	@VERSION=$$(echo $(CURRENT_TAG) | sed 's/^v//'); \
+	IFS='.' read -r major minor patch <<< "$$VERSION"; \
+	new_major=$$((major + 1)); \
+	NEW_TAG="v$$new_major.0.0"; \
+	echo "Creating release $$NEW_TAG..."; \
+	git tag -a $$NEW_TAG -m "Release $$NEW_TAG" && \
+	git push origin $$NEW_TAG

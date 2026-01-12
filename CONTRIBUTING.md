@@ -14,22 +14,26 @@ Thank you for your interest in contributing! This document provides guidelines a
 ### Getting Started
 
 1. **Fork and clone the repository**
+
    ```bash
    git clone https://github.com/YOUR_USERNAME/antigravity-dashboard-tui.git
    cd antigravity-dashboard-tui
    ```
 
 2. **Install development tools**
+
    ```bash
    make tools
    ```
 
 3. **Build the project**
+
    ```bash
    make build
    ```
 
 4. **Run tests**
+
    ```bash
    make test
    ```
@@ -39,11 +43,13 @@ Thank you for your interest in contributing! This document provides guidelines a
 ### Before Making Changes
 
 1. Create a new branch for your work:
+
    ```bash
    git checkout -b feature/your-feature-name
    ```
 
 2. Make sure everything works:
+
    ```bash
    make check
    ```
@@ -53,6 +59,7 @@ Thank you for your interest in contributing! This document provides guidelines a
 1. **Write code** following our coding standards (see below)
 
 2. **Run quality checks frequently:**
+
    ```bash
    make fmt      # Format code
    make lint     # Check for issues
@@ -60,6 +67,7 @@ Thank you for your interest in contributing! This document provides guidelines a
    ```
 
 3. **Before committing:**
+
    ```bash
    make check    # Run all checks (fmt + lint + test)
    ```
@@ -67,6 +75,7 @@ Thank you for your interest in contributing! This document provides guidelines a
 ### Submitting Changes
 
 1. **Commit your changes** with clear, descriptive messages:
+
    ```bash
    git add .
    git commit -m "feat: add new feature X"
@@ -81,6 +90,7 @@ Thank you for your interest in contributing! This document provides guidelines a
    - `chore:` Build, tooling, or dependency updates
 
 2. **Push to your fork:**
+
    ```bash
    git push origin feature/your-feature-name
    ```
@@ -227,6 +237,7 @@ func LoadConfig() (*Config, error) {
 ### PR Title
 
 Use conventional commit format in the PR title:
+
 - `feat: add user authentication`
 - `fix: resolve quota calculation bug`
 - `docs: update installation instructions`
@@ -234,12 +245,14 @@ Use conventional commit format in the PR title:
 ### PR Description
 
 Include:
+
 1. **What** this PR does
 2. **Why** the change is needed
 3. **How** it was implemented (if complex)
 4. **Testing** done
 
 Example:
+
 ```markdown
 ## Summary
 Adds support for multiple Google accounts.
@@ -261,6 +274,7 @@ Users need to monitor quotas across multiple accounts simultaneously.
 ### PR Checklist
 
 Before submitting, ensure:
+
 - [ ] `make check` passes
 - [ ] New code has tests
 - [ ] Documentation is updated
@@ -354,6 +368,7 @@ make help               # Show all targets
 ## Recognition
 
 Contributors are recognized in:
+
 - GitHub contributors page
 - Release notes (for significant contributions)
 

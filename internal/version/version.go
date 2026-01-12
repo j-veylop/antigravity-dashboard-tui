@@ -52,13 +52,13 @@ func getGitCommit() string {
 func getGitVersion() string {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "git", "describe", "--tags", "--abbrev=0")
+	cmd := exec.CommandContext(ctx, "git", "describe", "--tags")
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	if err := cmd.Run(); err == nil {
 		v := strings.TrimSpace(out.String())
 		if v != "" {
-			return strings.TrimPrefix(v, "v")
+			return v
 		}
 	}
 	return "dev"
@@ -69,4 +69,19 @@ func Info() string {
 	ensureInitialized()
 	return fmt.Sprintf("antigravity-dashboard-tui %s (commit: %s, built: %s, %s/%s)",
 		Version, Commit, Date, runtime.GOOS, runtime.GOARCH)
+}
+
+func GetVersion() string {
+	ensureInitialized()
+	return Version
+}
+
+func GetCommit() string {
+	ensureInitialized()
+	return Commit
+}
+
+func GetDate() string {
+	ensureInitialized()
+	return Date
 }

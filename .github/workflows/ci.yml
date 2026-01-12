@@ -24,6 +24,13 @@ jobs:
           version: latest
           args: --timeout=5m
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Markdown Lint
+        run: npx -y markdownlint-cli '**/*.md' --ignore node_modules
+
   test:
     name: Test
     runs-on: ubuntu-latest

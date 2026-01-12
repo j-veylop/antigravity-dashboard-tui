@@ -85,9 +85,9 @@ func (m *Model) renderAboutCard() string {
 	rows = append(rows, styles.CardTitleStyle.Render("About Antigravity Dashboard TUI"))
 	rows = append(rows, "")
 
-	rows = append(rows, m.renderConfigRow("Version", version.Version))
-	rows = append(rows, m.renderConfigRow("Build Date", version.Date))
-	rows = append(rows, m.renderConfigRow("Git Commit", version.Commit))
+	rows = append(rows, m.renderConfigRow("Version", version.GetVersion()))
+	rows = append(rows, m.renderConfigRow("Build Date", version.GetDate()))
+	rows = append(rows, m.renderConfigRow("Git Commit", version.GetCommit()))
 	rows = append(rows, m.renderConfigRow("Go Version", runtime.Version()))
 	rows = append(rows, m.renderConfigRow("Platform", fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)))
 	rows = append(rows, "")

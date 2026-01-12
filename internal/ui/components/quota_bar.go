@@ -304,14 +304,14 @@ func (t *TimeBar) ViewWithLabel(secondsRemaining int64, label string, width int,
 	}
 
 	bar := RenderTimeBarChars(percent, barWidth)
-	labelPadding := strings.Repeat(" ", labelWidth)
+	labelStr := styles.ProgressLabelStyle.Width(labelWidth).Render(label)
 
 	timeStyle := lipgloss.NewStyle().
 		Foreground(styles.TextSecondary).
 		Width(percentWidth).
 		Align(lipgloss.Right)
 
-	return fmt.Sprintf("%s [%s] %s", labelPadding, bar, timeStyle.Render(timeStr))
+	return fmt.Sprintf("%s [%s] %s", labelStr, bar, timeStyle.Render(timeStr))
 }
 
 // ViewFromSecondsWithLabel renders a time bar from seconds remaining with label alignment.

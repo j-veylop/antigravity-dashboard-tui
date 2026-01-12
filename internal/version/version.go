@@ -35,7 +35,6 @@ func Reset() {
 }
 
 func ensureInitialized() {
-
 	once.Do(func() {
 		if Date == "" {
 			Date = time.Now().Format("2006-01-02")

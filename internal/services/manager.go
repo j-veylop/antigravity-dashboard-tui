@@ -391,7 +391,9 @@ func (m *Manager) Database() *db.DB {
 
 // Close closes the manager and all its services.
 func (m *Manager) Close() error {
-	close(m.stopChan)
+	if m.stopChan != nil {
+		close(m.stopChan)
+	}
 
 	m.mu.Lock()
 	for _, sub := range m.subscribers {
@@ -402,12 +404,16 @@ func (m *Manager) Close() error {
 
 	var errs []error
 
-	if err := m.accounts.Close(); err != nil {
-		errs = append(errs, err)
+	if m.accounts != nil {
+		if err := m.accounts.Close(); err != nil {
+			errs = append(errs, err)
+		}
 	}
 
-	if err := m.quota.Close(); err != nil {
-		errs = append(errs, err)
+	if m.quota != nil {
+		if err := m.quota.Close(); err != nil {
+			errs = append(errs, err)
+		}
 	}
 
 	if m.database != nil {

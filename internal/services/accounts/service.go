@@ -394,9 +394,9 @@ func (s *Service) getDefaultActiveAccount(accounts []models.Account) string {
 
 func (s *Service) parseJSDashboardFormat(data []byte) ([]models.Account, string, error) {
 	var rawFile struct {
+		ActiveIndex *int                    `json:"activeIndex"`
 		Accounts    []models.RawAccountData `json:"accounts"`
 		Version     int                     `json:"version"`
-		ActiveIndex *int                    `json:"activeIndex"`
 	}
 
 	if err := json.Unmarshal(data, &rawFile); err != nil {

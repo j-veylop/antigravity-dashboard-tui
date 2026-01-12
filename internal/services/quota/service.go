@@ -69,9 +69,9 @@ type Service struct {
 	stopChan        chan struct{}
 	pollTicker      *time.Ticker
 	refreshSem      chan struct{}
+	httpClient      *http.Client
 	config          Config
 	mu              sync.RWMutex
-	httpClient      *http.Client
 }
 
 // New creates a new quota service.

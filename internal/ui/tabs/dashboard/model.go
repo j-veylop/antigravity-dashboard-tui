@@ -69,16 +69,16 @@ type AnimationState struct {
 type Model struct {
 	state          *app.State
 	animations     map[string]*AnimationState
+	spinner        components.LoadingSpinner
+	keys           keyMap
+	viewport       viewport.Model
+	timeBar        components.TimeBar
+	claudeQuotaBar components.QuotaBar
+	geminiQuotaBar components.QuotaBar
 	width          int
 	height         int
 	selectedIndex  int
 	animationFrame int
-	spinner        components.LoadingSpinner
-	keys           keyMap
-	viewport       viewport.Model
-	claudeQuotaBar components.QuotaBar
-	geminiQuotaBar components.QuotaBar
-	timeBar        components.TimeBar
 }
 
 // New creates a new dashboard model.

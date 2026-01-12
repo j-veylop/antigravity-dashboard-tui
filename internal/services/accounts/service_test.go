@@ -73,7 +73,7 @@ func TestAddAccount(t *testing.T) {
 		ProjectID: "test-project-123",
 	}
 
-	err := svc.AddAccount(account)
+	err := svc.AddAccount(&account)
 	if err != nil {
 		t.Fatalf("AddAccount() failed: %v", err)
 	}
@@ -101,11 +101,11 @@ func TestAddAccount_Duplicate(t *testing.T) {
 
 	account := models.Account{Email: "test@example.com"}
 
-	if err := svc.AddAccount(account); err != nil {
+	if err := svc.AddAccount(&account); err != nil {
 		t.Fatalf("first AddAccount() failed: %v", err)
 	}
 
-	err := svc.AddAccount(account)
+	err := svc.AddAccount(&account)
 	if err == nil {
 		t.Fatal("AddAccount() should fail for duplicate email")
 	}
@@ -120,7 +120,7 @@ func TestAddAccount_SetsActiveOnFirst(t *testing.T) {
 
 	account := models.Account{Email: "test@example.com"}
 
-	if err := svc.AddAccount(account); err != nil {
+	if err := svc.AddAccount(&account); err != nil {
 		t.Fatalf("AddAccount() failed: %v", err)
 	}
 
@@ -142,7 +142,7 @@ func TestUpdateAccount(t *testing.T) {
 		ProjectID: "project-1",
 	}
 
-	if err := svc.AddAccount(original); err != nil {
+	if err := svc.AddAccount(&original); err != nil {
 		t.Fatalf("AddAccount() failed: %v", err)
 	}
 
@@ -155,7 +155,7 @@ func TestUpdateAccount(t *testing.T) {
 	updated.ProjectID = "project-2"
 	updated.DisplayName = "Updated Name"
 
-	if err := svc.UpdateAccount(updated); err != nil {
+	if err := svc.UpdateAccount(&updated); err != nil {
 		t.Fatalf("UpdateAccount() failed: %v", err)
 	}
 
@@ -181,7 +181,7 @@ func TestUpdateAccount_NotFound(t *testing.T) {
 		Email: "nonexistent@example.com",
 	}
 
-	err := svc.UpdateAccount(account)
+	err := svc.UpdateAccount(&account)
 	if err == nil {
 		t.Fatal("UpdateAccount() should fail for non-existent account")
 	}
@@ -192,7 +192,7 @@ func TestDeleteAccount(t *testing.T) {
 
 	account := models.Account{Email: "test@example.com"}
 
-	if err := svc.AddAccount(account); err != nil {
+	if err := svc.AddAccount(&account); err != nil {
 		t.Fatalf("AddAccount() failed: %v", err)
 	}
 
@@ -211,10 +211,10 @@ func TestDeleteAccount_UpdatesActive(t *testing.T) {
 	acc1 := models.Account{Email: "test1@example.com"}
 	acc2 := models.Account{Email: "test2@example.com"}
 
-	if err := svc.AddAccount(acc1); err != nil {
+	if err := svc.AddAccount(&acc1); err != nil {
 		t.Fatalf("AddAccount(acc1) failed: %v", err)
 	}
-	if err := svc.AddAccount(acc2); err != nil {
+	if err := svc.AddAccount(&acc2); err != nil {
 		t.Fatalf("AddAccount(acc2) failed: %v", err)
 	}
 
@@ -247,10 +247,10 @@ func TestSetActiveAccount(t *testing.T) {
 	acc1 := models.Account{Email: "test1@example.com"}
 	acc2 := models.Account{Email: "test2@example.com"}
 
-	if err := svc.AddAccount(acc1); err != nil {
+	if err := svc.AddAccount(&acc1); err != nil {
 		t.Fatalf("AddAccount(acc1) failed: %v", err)
 	}
-	if err := svc.AddAccount(acc2); err != nil {
+	if err := svc.AddAccount(&acc2); err != nil {
 		t.Fatalf("AddAccount(acc2) failed: %v", err)
 	}
 
@@ -285,7 +285,7 @@ func TestGetAccountByEmail(t *testing.T) {
 		ProjectID: "project-123",
 	}
 
-	if err := svc.AddAccount(account); err != nil {
+	if err := svc.AddAccount(&account); err != nil {
 		t.Fatalf("AddAccount() failed: %v", err)
 	}
 
@@ -317,7 +317,7 @@ func TestUpdateAccountEmail(t *testing.T) {
 
 	account := models.Account{Email: "old@example.com"}
 
-	if err := svc.AddAccount(account); err != nil {
+	if err := svc.AddAccount(&account); err != nil {
 		t.Fatalf("AddAccount() failed: %v", err)
 	}
 
@@ -343,7 +343,7 @@ func TestCount(t *testing.T) {
 		t.Errorf("Count() = %d, want 0", svc.Count())
 	}
 
-	if err := svc.AddAccount(models.Account{Email: "test1@example.com"}); err != nil {
+	if err := svc.AddAccount(&models.Account{Email: "test1@example.com"}); err != nil {
 		t.Fatalf("AddAccount() failed: %v", err)
 	}
 
@@ -351,7 +351,7 @@ func TestCount(t *testing.T) {
 		t.Errorf("Count() = %d, want 1", svc.Count())
 	}
 
-	if err := svc.AddAccount(models.Account{Email: "test2@example.com"}); err != nil {
+	if err := svc.AddAccount(&models.Account{Email: "test2@example.com"}); err != nil {
 		t.Fatalf("AddAccount() failed: %v", err)
 	}
 
@@ -438,7 +438,7 @@ func TestPersistence(t *testing.T) {
 		ProjectID: "project-123",
 	}
 
-	if err := svc1.AddAccount(account); err != nil {
+	if err := svc1.AddAccount(&account); err != nil {
 		t.Fatalf("AddAccount() failed: %v", err)
 	}
 
@@ -493,7 +493,7 @@ func TestEvents_AccountAdded(t *testing.T) {
 
 	account := models.Account{Email: "test@example.com"}
 
-	if err := svc.AddAccount(account); err != nil {
+	if err := svc.AddAccount(&account); err != nil {
 		t.Fatalf("AddAccount() failed: %v", err)
 	}
 
@@ -528,7 +528,7 @@ func TestFileFormat(t *testing.T) {
 		ProjectID: "project-123",
 	}
 
-	if err := svc.AddAccount(account); err != nil {
+	if err := svc.AddAccount(&account); err != nil {
 		t.Fatalf("AddAccount() failed: %v", err)
 	}
 

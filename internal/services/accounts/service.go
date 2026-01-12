@@ -196,7 +196,7 @@ func (s *Service) SetActiveAccount(idOrEmail string) error {
 }
 
 // AddAccount adds a new account.
-func (s *Service) AddAccount(account models.Account) error {
+func (s *Service) AddAccount(account *models.Account) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -216,7 +216,7 @@ func (s *Service) AddAccount(account models.Account) error {
 		account.AddedAt = time.Now()
 	}
 
-	s.accounts = append(s.accounts, account)
+	s.accounts = append(s.accounts, *account)
 
 	// Set as active if first account
 	if len(s.accounts) == 1 {
@@ -229,12 +229,12 @@ func (s *Service) AddAccount(account models.Account) error {
 		return fmt.Errorf("failed to save accounts: %w", err)
 	}
 
-	s.sendEvent(Event{Type: EventAccountAdded, Account: &account})
+	s.sendEvent(Event{Type: EventAccountAdded, Account: account})
 	return nil
 }
 
 // UpdateAccount updates an existing account.
-func (s *Service) UpdateAccount(account models.Account) error {
+func (s *Service) UpdateAccount(account *models.Account) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -252,7 +252,7 @@ func (s *Service) UpdateAccount(account models.Account) error {
 		if account.AddedAt.IsZero() {
 			account.AddedAt = acc.AddedAt
 		}
-		s.accounts[i] = account
+		s.accounts[i] = *account
 		found = true
 		break
 	}
@@ -265,7 +265,7 @@ func (s *Service) UpdateAccount(account models.Account) error {
 		return fmt.Errorf("failed to save accounts: %w", err)
 	}
 
-	s.sendEvent(Event{Type: EventAccountUpdated, Account: &account})
+	s.sendEvent(Event{Type: EventAccountUpdated, Account: account})
 	return nil
 }
 
@@ -342,7 +342,7 @@ func (s *Service) UpdateAccountEmail(oldEmail, newEmail string) error {
 	newAcc := *acc
 	newAcc.Email = newEmail
 
-	return s.UpdateAccount(newAcc)
+	return s.UpdateAccount(&newAcc)
 }
 
 // parseAccounts parses account data handling multiple formats.

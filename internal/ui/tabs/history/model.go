@@ -20,6 +20,8 @@ type keyMap struct {
 	Refresh     key.Binding
 	Up          key.Binding
 	Down        key.Binding
+	Home        key.Binding
+	End         key.Binding
 }
 
 // defaultKeyMap returns the default key bindings for the history tab.
@@ -40,6 +42,14 @@ func defaultKeyMap() keyMap {
 		Down: key.NewBinding(
 			key.WithKeys("down", "j"),
 			key.WithHelp("↓/j", "scroll down"),
+		),
+		Home: key.NewBinding(
+			key.WithKeys("g", "home"),
+			key.WithHelp("g/home", "go to top"),
+		),
+		End: key.NewBinding(
+			key.WithKeys("G", "end"),
+			key.WithHelp("G/end", "go to bottom"),
 		),
 	}
 }
@@ -211,6 +221,12 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (app.Tab, tea.Cmd) {
 		m.loading = true
 		cmds = append(cmds, m.loadHistoryCmd())
 
+	case key.Matches(msg, m.keys.Home):
+		m.viewport.GotoTop()
+
+	case key.Matches(msg, m.keys.End):
+		m.viewport.GotoBottom()
+
 	default:
 		var cmd tea.Cmd
 		m.viewport, cmd = m.viewport.Update(msg)
@@ -239,6 +255,6 @@ func (m *Model) ShortHelp() []key.Binding {
 func (m *Model) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{m.keys.ToggleRange, m.keys.Refresh},
-		{m.keys.Up, m.keys.Down},
+		{m.keys.Up, m.keys.Down, m.keys.Home, m.keys.End},
 	}
 }

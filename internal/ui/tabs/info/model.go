@@ -16,6 +16,8 @@ type keyMap struct {
 	Copy    key.Binding
 	Up      key.Binding
 	Down    key.Binding
+	Home    key.Binding
+	End     key.Binding
 }
 
 // defaultKeyMap returns the default key bindings for the info tab.
@@ -36,6 +38,14 @@ func defaultKeyMap() keyMap {
 		Down: key.NewBinding(
 			key.WithKeys("down", "j"),
 			key.WithHelp("↓/j", "down"),
+		),
+		Home: key.NewBinding(
+			key.WithKeys("g", "home"),
+			key.WithHelp("g/home", "go to top"),
+		),
+		End: key.NewBinding(
+			key.WithKeys("G", "end"),
+			key.WithHelp("G/end", "go to bottom"),
 		),
 	}
 }
@@ -78,6 +88,10 @@ func (m *Model) Update(msg tea.Msg) (app.Tab, tea.Cmd) {
 					return app.CopyToClipboardMsg{Text: m.config.AccountsPath}
 				}
 			}
+		case key.Matches(keyMsg, m.keys.Home):
+			m.viewport.GotoTop()
+		case key.Matches(keyMsg, m.keys.End):
+			m.viewport.GotoBottom()
 		default:
 			var cmd tea.Cmd
 			m.viewport, cmd = m.viewport.Update(keyMsg)
@@ -108,5 +122,6 @@ func (m *Model) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{m.keys.Copy},
 		{m.keys.Refresh},
+		{m.keys.Up, m.keys.Down, m.keys.Home, m.keys.End},
 	}
 }

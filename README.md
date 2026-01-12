@@ -62,8 +62,8 @@ Then edit `.env` and add your Google OAuth credentials if not using automated au
 | Key             | Action                                            |
 | --------------- | ------------------------------------------------- |
 | `1` - `3`       | Switch Tabs (Dashboard, History, Info)            |
-| `Tab`           | Next Tab                                          |
-| `Shift+Tab`     | Previous Tab                                      |
+| `Tab` / `l`     | Next Tab                                          |
+| `S-Tab` / `h`   | Previous Tab                                      |
 | `r`             | Refresh all data                                  |
 | `?`             | Toggle help overlay                               |
 | `q` or `Ctrl+C` | Quit                                              |
@@ -76,6 +76,8 @@ Then edit `.env` and add your Google OAuth credentials if not using automated au
 | ----------------- | ---------------- |
 | `j` or `↓`        | Next Account     |
 | `k` or `↑`        | Previous Account |
+| `g` / `Home`      | First Account    |
+| `G` / `End`       | Last Account     |
 
 #### 👥 Accounts (Upcoming)
 

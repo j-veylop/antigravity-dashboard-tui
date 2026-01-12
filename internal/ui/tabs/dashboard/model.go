@@ -24,35 +24,35 @@ func animationTickCmd() tea.Cmd {
 
 // keyMap defines the key bindings specific to the dashboard tab.
 type keyMap struct {
-	NextAccount key.Binding
-	PrevAccount key.Binding
-	Refresh     key.Binding
-	Up          key.Binding
-	Down        key.Binding
+	NextAccount  key.Binding
+	PrevAccount  key.Binding
+	FirstAccount key.Binding
+	LastAccount  key.Binding
+	Refresh      key.Binding
 }
 
 // defaultKeyMap returns the default key bindings for the dashboard tab.
 func defaultKeyMap() keyMap {
 	return keyMap{
 		NextAccount: key.NewBinding(
-			key.WithKeys("n"),
-			key.WithHelp("n", "next account"),
+			key.WithKeys("n", "j", "down"),
+			key.WithHelp("j/n", "next account"),
 		),
 		PrevAccount: key.NewBinding(
-			key.WithKeys("p"),
-			key.WithHelp("p", "prev account"),
+			key.WithKeys("p", "k", "up"),
+			key.WithHelp("k/p", "prev account"),
+		),
+		FirstAccount: key.NewBinding(
+			key.WithKeys("g", "home"),
+			key.WithHelp("g", "first account"),
+		),
+		LastAccount: key.NewBinding(
+			key.WithKeys("G", "end"),
+			key.WithHelp("G", "last account"),
 		),
 		Refresh: key.NewBinding(
 			key.WithKeys("r"),
 			key.WithHelp("r", "refresh"),
-		),
-		Up: key.NewBinding(
-			key.WithKeys("up", "k"),
-			key.WithHelp("↑/k", "up"),
-		),
-		Down: key.NewBinding(
-			key.WithKeys("down", "j"),
-			key.WithHelp("↓/j", "down"),
 		),
 	}
 }
@@ -143,6 +143,14 @@ func (m *Model) Update(msg tea.Msg) (app.Tab, tea.Cmd) {
 		case key.Matches(msg, m.keys.PrevAccount):
 			if accountCount > 0 {
 				m.selectedIndex = (m.selectedIndex - 1 + accountCount) % accountCount
+			}
+		case key.Matches(msg, m.keys.FirstAccount):
+			if accountCount > 0 {
+				m.selectedIndex = 0
+			}
+		case key.Matches(msg, m.keys.LastAccount):
+			if accountCount > 0 {
+				m.selectedIndex = accountCount - 1
 			}
 		default:
 			var cmd tea.Cmd
@@ -268,6 +276,7 @@ func (m *Model) ShortHelp() []key.Binding {
 func (m *Model) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{m.keys.NextAccount, m.keys.PrevAccount},
+		{m.keys.FirstAccount, m.keys.LastAccount},
 		{m.keys.Refresh},
 	}
 }

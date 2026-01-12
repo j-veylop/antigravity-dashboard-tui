@@ -842,8 +842,8 @@ func (m *Model) renderHelp() string {
 
 	lines = append(lines, m.styles.Highlight.Render("Navigation"))
 	lines = append(lines, "  1-2        Switch tabs")
-	lines = append(lines, "  Tab        Next tab")
-	lines = append(lines, "  Shift+Tab  Previous tab")
+	lines = append(lines, "  Tab/l      Next tab")
+	lines = append(lines, "  S-Tab/h    Previous tab")
 	lines = append(lines, "")
 
 	lines = append(lines, m.styles.Highlight.Render("Actions"))
@@ -853,7 +853,9 @@ func (m *Model) renderHelp() string {
 	lines = append(lines, "")
 
 	lines = append(lines, m.styles.Highlight.Render("Lists"))
-	lines = append(lines, "  j/k, ↑/↓   Move up/down")
+	lines = append(lines, "  j/k        Move up/down")
+	lines = append(lines, "  g/G        Go to top/bottom")
+	lines = append(lines, "  C-u/C-d    Page up/down")
 	lines = append(lines, "  Enter      Select item")
 	lines = append(lines, "  /          Filter")
 	lines = append(lines, "")

@@ -61,6 +61,7 @@ type Service struct {
 	filePath      string
 	accounts      []models.Account
 	mu            sync.RWMutex
+	closeOnce     sync.Once
 }
 
 // defaultAccountsPath returns the default accounts file path.
@@ -395,19 +396,16 @@ func (s *Service) parseJSDashboardFormat(data []byte) ([]models.Account, string,
 	var rawFile struct {
 		Accounts    []models.RawAccountData `json:"accounts"`
 		Version     int                     `json:"version"`
-		ActiveIndex int                     `json:"activeIndex"`
+		ActiveIndex *int                    `json:"activeIndex"`
 	}
 
 	if err := json.Unmarshal(data, &rawFile); err != nil {
 		return nil, "", err
 	}
 
-	// Basic validation: if no accounts but no error, it might be an empty file or other format
-	// But json.Unmarshal succeeds on empty lists.
-	// Check if keys match expected structure? json.Unmarshal is permissive.
-	// If Accounts is nil/empty and ActiveIndex is 0, it might be a valid empty file or a mismatch.
-	// Let's assume if Unmarshal succeeds and we have some structure match, it's good.
-	// Actually, if data matches structure, err is nil.
+	if rawFile.ActiveIndex == nil {
+		return nil, "", fmt.Errorf("missing activeIndex")
+	}
 
 	accounts := make([]models.Account, len(rawFile.Accounts))
 	for i, raw := range rawFile.Accounts {
@@ -418,8 +416,8 @@ func (s *Service) parseJSDashboardFormat(data []byte) ([]models.Account, string,
 	}
 
 	var activeAccount string
-	if rawFile.ActiveIndex >= 0 && rawFile.ActiveIndex < len(accounts) {
-		activeAccount = accounts[rawFile.ActiveIndex].ID
+	if *rawFile.ActiveIndex >= 0 && *rawFile.ActiveIndex < len(accounts) {
+		activeAccount = accounts[*rawFile.ActiveIndex].ID
 	} else if len(accounts) > 0 {
 		activeAccount = accounts[0].ID
 	}
@@ -637,16 +635,19 @@ func (s *Service) sendEvent(event Event) {
 
 // Close stops the file watcher and cleans up resources.
 func (s *Service) Close() error {
-	close(s.stopChan)
+	var err error
+	s.closeOnce.Do(func() {
+		close(s.stopChan)
 
-	s.mu.Lock()
-	if s.debounceTimer != nil {
-		s.debounceTimer.Stop()
-	}
-	s.mu.Unlock()
+		s.mu.Lock()
+		if s.debounceTimer != nil {
+			s.debounceTimer.Stop()
+		}
+		s.mu.Unlock()
 
-	if s.watcher != nil {
-		return s.watcher.Close()
-	}
-	return nil
+		if s.watcher != nil {
+			err = s.watcher.Close()
+		}
+	})
+	return err
 }

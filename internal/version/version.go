@@ -21,9 +21,21 @@ var (
 	Date = ""
 
 	once sync.Once
+
+	// execCommand allows mocking exec.CommandContext for testing
+	execCommand = exec.CommandContext
 )
 
+// Reset resets the package state for testing.
+func Reset() {
+	once = sync.Once{}
+	Version = ""
+	Commit = ""
+	Date = ""
+}
+
 func ensureInitialized() {
+
 	once.Do(func() {
 		if Date == "" {
 			Date = time.Now().Format("2006-01-02")
@@ -40,7 +52,7 @@ func ensureInitialized() {
 func getGitCommit() string {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "git", "describe", "--always", "--dirty")
+	cmd := execCommand(ctx, "git", "describe", "--always", "--dirty")
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	if err := cmd.Run(); err != nil {
@@ -52,7 +64,7 @@ func getGitCommit() string {
 func getGitVersion() string {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "git", "describe", "--tags")
+	cmd := execCommand(ctx, "git", "describe", "--tags")
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	if err := cmd.Run(); err == nil {

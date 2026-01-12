@@ -63,7 +63,7 @@ func (t *CachedToken) IsValid() bool {
 }
 
 // RefreshAccessToken exchanges a refresh token for a new access token.
-func RefreshAccessToken(refreshToken, clientID, clientSecret string) (*TokenResponse, error) {
+func RefreshAccessToken(client *http.Client, refreshToken, clientID, clientSecret string) (*TokenResponse, error) {
 	if refreshToken == "" {
 		return nil, fmt.Errorf("refresh token is empty")
 	}
@@ -80,7 +80,9 @@ func RefreshAccessToken(refreshToken, clientID, clientSecret string) (*TokenResp
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	client := &http.Client{Timeout: 30 * time.Second}
+	if client == nil {
+		client = &http.Client{Timeout: 30 * time.Second}
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("token request failed: %w", err)
@@ -109,7 +111,6 @@ func RefreshAccessToken(refreshToken, clientID, clientSecret string) (*TokenResp
 }
 
 // Response represents the full quota API response.
-// Response represents the full quota API response.
 type Response struct {
 	ModelQuotas []models.ModelQuota `json:"modelQuotas"`
 }
@@ -137,8 +138,7 @@ func normalizeModelFamily(name string) string {
 }
 
 // FetchQuota retrieves quota information from the Google Cloud Code API.
-// FetchQuota retrieves quota information from the Google Cloud Code API.
-func FetchQuota(accessToken string) (*Response, error) {
+func FetchQuota(client *http.Client, accessToken string) (*Response, error) {
 	if accessToken == "" {
 		return nil, fmt.Errorf("access token is empty")
 	}
@@ -147,7 +147,7 @@ func FetchQuota(accessToken string) (*Response, error) {
 
 	// Try each endpoint
 	for _, endpoint := range antigravityEndpoints {
-		body, err := makeQuotaRequest(endpoint, accessToken)
+		body, err := makeQuotaRequest(client, endpoint, accessToken)
 		if err != nil {
 			lastErr = err
 			continue
@@ -168,7 +168,7 @@ func FetchQuota(accessToken string) (*Response, error) {
 	return nil, fmt.Errorf("failed to fetch quota from any endpoint")
 }
 
-func makeQuotaRequest(endpoint, accessToken string) ([]byte, error) {
+func makeQuotaRequest(client *http.Client, endpoint, accessToken string) ([]byte, error) {
 	requestURL := endpoint + "/v1internal:fetchAvailableModels"
 	req, err := http.NewRequestWithContext(context.Background(), "POST", requestURL, strings.NewReader("{}"))
 	if err != nil {
@@ -181,7 +181,9 @@ func makeQuotaRequest(endpoint, accessToken string) ([]byte, error) {
 		req.Header.Set(k, v)
 	}
 
-	client := &http.Client{Timeout: 30 * time.Second}
+	if client == nil {
+		client = &http.Client{Timeout: 30 * time.Second}
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("quota request failed: %w", err)
@@ -270,8 +272,7 @@ type UserInfo struct {
 }
 
 // FetchUserInfo retrieves user information from Google.
-// FetchUserInfo retrieves user information from Google.
-func FetchUserInfo(accessToken string) (*UserInfo, error) {
+func FetchUserInfo(client *http.Client, accessToken string) (*UserInfo, error) {
 	if accessToken == "" {
 		return nil, fmt.Errorf("access token is empty")
 	}
@@ -283,7 +284,9 @@ func FetchUserInfo(accessToken string) (*UserInfo, error) {
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Accept", "application/json")
 
-	client := &http.Client{Timeout: 30 * time.Second}
+	if client == nil {
+		client = &http.Client{Timeout: 30 * time.Second}
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("userinfo request failed: %w", err)

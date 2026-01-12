@@ -194,6 +194,32 @@ func TestParseTimeField_Invalid(t *testing.T) {
 	}
 }
 
+func TestParseTimeField_Boolean(t *testing.T) {
+	got := parseTimeField(json.RawMessage(`true`))
+	if !got.IsZero() {
+		t.Errorf("parseTimeField(true) should return zero time, got %v", got)
+	}
+}
+
+func TestParseTimeField_Boundary(t *testing.T) {
+	// Case: Exactly 1e12. Should be seconds.
+	input := `1000000000000` // 1e12
+	got := parseTimeField(json.RawMessage(input))
+	// 1e12 seconds from epoch
+	expected := time.Unix(1000000000000, 0)
+	if !got.Equal(expected) {
+		t.Errorf("parseTimeField(1e12) = %v, want %v", got, expected)
+	}
+
+	// Case: 1e12 + 1. Should be milliseconds.
+	input2 := `1000000000001`
+	got2 := parseTimeField(json.RawMessage(input2))
+	expected2 := time.UnixMilli(1000000000001)
+	if !got2.Equal(expected2) {
+		t.Errorf("parseTimeField(1e12+1) = %v, want %v", got2, expected2)
+	}
+}
+
 func TestParseTimeField_Null(t *testing.T) {
 	got := parseTimeField(json.RawMessage(`null`))
 

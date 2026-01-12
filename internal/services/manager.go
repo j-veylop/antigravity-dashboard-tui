@@ -103,6 +103,7 @@ func NewManager(cfg *config.Config) (*Manager, error) {
 	quotaConfig.PollInterval = cfg.QuotaRefreshInterval
 
 	m.quota = quota.New(m.accounts, quotaConfig)
+	m.quota.Start()
 
 	go m.routeEvents()
 

@@ -1,6 +1,7 @@
 package projection
 
 import (
+	"math"
 	"path/filepath"
 	"testing"
 	"time"
@@ -88,6 +89,45 @@ func TestCalculateProjections_WithData(t *testing.T) {
 	}
 	if proj.Claude.SessionRate <= 0 {
 		t.Error("Expected positive session rate")
+	}
+}
+
+func TestCalculateProjections_MediumConfidence(t *testing.T) {
+	svc, database := newTestService(t)
+	defer database.Close()
+
+	now := time.Now().UTC()
+	// Add 10 data points (6 <= x < 24)
+	for i := range 10 {
+		snapshot := &models.AggregatedSnapshot{
+			Email:          "test@example.com",
+			BucketTime:     now.Add(time.Duration(-i*5) * time.Minute).Truncate(5 * time.Minute),
+			ClaudeQuotaAvg: float64(100 - i),
+			GeminiQuotaAvg: 100.0,
+			ClaudeConsumed: 1.0,
+			GeminiConsumed: 0.0,
+			SampleCount:    1,
+			SessionID:      "ses_test",
+			Tier:           "PRO",
+		}
+		database.UpsertAggregatedSnapshot(snapshot)
+	}
+
+	svc.mu.Lock()
+	svc.sessionIDs["test@example.com"] = "ses_test"
+	svc.mu.Unlock()
+
+	proj, err := svc.CalculateProjections(
+		"test@example.com",
+		90.0, 100.0,
+		time.Now().Add(5*time.Hour), time.Now().Add(5*time.Hour),
+	)
+	if err != nil {
+		t.Fatalf("Failed to calculate projections: %v", err)
+	}
+
+	if proj.Claude.Confidence != "medium" {
+		t.Errorf("Expected medium confidence with 10 data points, got %s", proj.Claude.Confidence)
 	}
 }
 
@@ -340,5 +380,83 @@ func TestAggregateSnapshot_EmptyTier(t *testing.T) {
 	snapshot, _ := database.GetLastAggregatedSnapshot("test@example.com")
 	if snapshot == nil {
 		t.Fatal("Expected snapshot to exist")
+	}
+}
+
+func TestFormatComparison(t *testing.T) {
+	svc, db := newTestService(t)
+	defer db.Close()
+
+	tests := []struct {
+		name      string
+		current   float64
+		reference float64
+		want      string
+	}{
+		{"NoData", 10.0, 0.0, "No prior data"},
+		{"Similar", 10.5, 10.0, "Similar to last month"}, // diff 5%
+		{"Higher", 20.0, 10.0, "100% higher than last month"},
+		{"Lower", 5.0, 10.0, "50% lower than last month"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := svc.formatComparison(tt.current, tt.reference)
+			if got != tt.want {
+				t.Errorf("formatComparison(%v, %v) = %q, want %q", tt.current, tt.reference, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestFormatHistoricalComparison(t *testing.T) {
+	svc, db := newTestService(t)
+	defer db.Close()
+
+	tests := []struct {
+		name      string
+		current   float64
+		reference float64
+		want      string
+	}{
+		{"NoData", 10.0, 0.0, "Building history..."},
+		{"Typical", 11.0, 10.0, "Typical for you"}, // diff 10% (< 15%)
+		{"Above", 20.0, 10.0, "Above your average"},
+		{"Below", 5.0, 10.0, "Below your average"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := svc.formatHistoricalComparison(tt.current, tt.reference)
+			if got != tt.want {
+				t.Errorf("formatHistoricalComparison(%v, %v) = %q, want %q", tt.current, tt.reference, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCalculateDepletion_EdgeCases(t *testing.T) {
+	svc, db := newTestService(t)
+	defer db.Close()
+
+	proj := &models.ModelProjection{}
+
+	// Case 1: Session rate negative, but historical > 0 (fallback)
+	// sessionRate -1, historical 10
+	effective := svc.calculateDepletion(proj, 50.0, -1.0, 10.0)
+	if effective != 10.0 {
+		t.Errorf("expected effective rate 10.0, got %f", effective)
+	}
+
+	// Case 2: Both negative/zero (Infinite)
+	effective = svc.calculateDepletion(proj, 50.0, -1.0, 0.0)
+	if effective != -1.0 {
+		// logic: if effectiveRate <= 0 && historicalRate > 0 -> effective = historical
+		// else effective = sessionRate (-1.0)
+		t.Errorf("expected effective rate -1.0, got %f", effective)
+	}
+
+	if !math.IsInf(proj.SessionHoursLeft, 1) {
+		t.Error("expected infinite hours left")
 	}
 }

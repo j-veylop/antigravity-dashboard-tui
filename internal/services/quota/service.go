@@ -3,6 +3,7 @@ package quota
 import (
 	"fmt"
 	"maps"
+	"net/http"
 	"sync"
 	"time"
 
@@ -70,6 +71,7 @@ type Service struct {
 	refreshSem      chan struct{}
 	config          Config
 	mu              sync.RWMutex
+	httpClient      *http.Client
 }
 
 // New creates a new quota service.
@@ -86,12 +88,15 @@ func New(provider AccountProvider, config Config) *Service {
 		stopChan:        make(chan struct{}),
 		config:          config,
 		refreshSem:      make(chan struct{}, config.MaxConcurrent),
+		httpClient:      &http.Client{Timeout: 30 * time.Second},
 	}
 
-	// Start polling goroutine
-	go s.pollQuota()
-
 	return s
+}
+
+// Start starts the background polling.
+func (s *Service) Start() {
+	go s.pollQuota()
 }
 
 // Events returns the event channel.
@@ -129,7 +134,7 @@ func (s *Service) GetAccessToken(email string) (string, error) {
 	// Retry with exponential backoff
 	backoff := 500 * time.Millisecond
 	for i := range 3 {
-		tokenResp, err = RefreshAccessToken(refreshToken, s.config.ClientID, s.config.ClientSecret)
+		tokenResp, err = RefreshAccessToken(s.httpClient, refreshToken, s.config.ClientID, s.config.ClientSecret)
 		if err == nil {
 			break
 		}
@@ -188,7 +193,7 @@ func (s *Service) RefreshQuota(email string) (*models.QuotaInfo, error) {
 		email = newEmail
 	}
 
-	quotaResp, err := FetchQuota(accessToken)
+	quotaResp, err := FetchQuota(s.httpClient, accessToken)
 	if err != nil {
 		return s.handleQuotaError(email, err)
 	}
@@ -215,7 +220,7 @@ func (s *Service) handleQuotaError(email string, err error) (*models.QuotaInfo, 
 }
 
 func (s *Service) checkEmailUpdate(email, accessToken string) string {
-	if userInfo, err := FetchUserInfo(accessToken); err == nil && userInfo.Email != "" {
+	if userInfo, err := FetchUserInfo(s.httpClient, accessToken); err == nil && userInfo.Email != "" {
 		if userInfo.Email != email {
 			if err := s.accountProvider.UpdateAccountEmail(email, userInfo.Email); err == nil {
 				return userInfo.Email
